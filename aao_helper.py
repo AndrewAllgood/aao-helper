@@ -1,10 +1,20 @@
+import asyncio
+
+import discord
 from discord import app_commands
+from discord.ext import tasks
 from typing import Optional
 import re
 import random
+import types
+import datetime as datetime_module  # stupid aspect of datetime being also an object
+from datetime import datetime, timezone, timedelta
 
 from params import *
 from rank_grant import *
+from embed_maker import *
+from exhibition import *
+from thread_auto_manage import *
 
 
 @tree.command(description="Randomly assign sides for 2-5 players")
@@ -35,157 +45,32 @@ async def sides(interaction: discord.Interaction, player_one: str, player_two: s
     await interaction.response.send_message('\n'.join(a + b for a, b in zip(game_sides[g], players)))
 
 
-@tree.command(description="Create or edit embed message (reply to edit)")
+@tree.command(description="Moves showcase channel between cache and main category")
 @app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.checks.bot_has_permissions(send_messages=True)
-@app_commands.describe(
-    title='Title header of embed (max 256 char)',
-    description='Body text of embed (max 4096 char)',
-    footer='Footer text of embed (max 2048 char)',
-    color='Color of embed siding (hex code)',
-    image='Large image below body (url to image)',
-)
-async def write_embed(interaction: discord.Interaction, title: str, description: str, footer: Optional[str] = None,
-                      color: Optional[str] = None, image: Optional[str] = None):
-    async def hex_str_to_int(hex_str: str):  # Helper function for color parameter
-        hex_str = hex_str.strip().strip("#")
-        for c in hex_str:
-            if c not in "0123456789abcdefABCDEF":  # characters that are valid in hexadecimal
-                await interaction.response.send_message("Color must be provided as valid hex code.", ephemeral=True)
-                return 0
-        return int(hex_str, 16)
-
-    err_msg = ""
-    if len(title) > TITLE_LIMIT:
-        err_msg += f"Character limit of title ({TITLE_LIMIT}) exceeded by {len(title) - TITLE_LIMIT}\n"
-
-    if len(description) > DESC_LIMIT:
-        err_msg += f"Character limit of description ({DESC_LIMIT}) exceeded by {len(description) - DESC_LIMIT}\n"
-
-    if footer and len(footer) > FOOTER_LIMIT:
-        err_msg += f"Character limit of footer ({FOOTER_LIMIT}) exceeded by {len(footer) - FOOTER_LIMIT}\n"
-
-    if err_msg:
-        await interaction.response.send_message(err_msg, ephemeral=True)
+@app_commands.checks.bot_has_permissions(manage_channels=True)
+async def toggle_showcase(interaction: discord.Interaction):
+    showcase_dict = SHOWCASE_CHANNELS.get(interaction.channel_id)
+    if not showcase_dict:
+        await interaction.response.send_message("Must be in a showcase channel.", ephemeral=True)
         return
-
-    embed = discord.Embed(title=title, description=description, color=hex_str_to_int(color) if color else 0)
-    if footer: embed.set_footer(footer)
-    if image: embed.set_image(image)  # Note: have not added url validation for the image
-
-    target_msg = interaction.message.reference
-    content = interaction.message.content
-    if target_msg and target_msg.author == bot.user:
-        await target_msg.edit(embed=embed)
-        if content:
-            if re.match('^\s\s?$', content):
-                await interaction.response.send_message(
-                    "To help prevent accidental erasures, at least 3 spaces are required to delete non-embed message content.",
-                    ephemeral=True)
-            elif re.match('^\s\s\s+$', content):
-                await target_msg.edit(content=None)
-            else:
-                await target_msg.edit(content=content)
-
     else:
-        await interaction.response.send_message(content=content, embed=embed)
-
-
-@tree.command(description="Toggles whether a thread or channel is kept unarchived")
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.checks.bot_has_permissions(manage_threads=True)
-async def auto_unarchive(interaction: discord.Interaction):
-    c_id = interaction.message.channel.id  # Can be thread id or channel id if not thread
-    cur.execute(
-        "SELECT channelthread_id FROM threads_persist WHERE channelthread_id = (?)",
-        (c_id)
-    )
-    if cur.fetchall():
-        cur.execute(
-            "DELETE FROM threads_persist WHERE channelthread_id = (?)",
-            (c_id)
-        )
-        conn.commit()
-        await interaction.response.send_message("No longer thread-unarchiving automatically")
-    else:
-        cur.execute(
-            "INSERT OR REPLACE INTO threads_persist (channelthread_id) VALUES (?)",
-            (c_id)
-        )
-        conn.commit()
-        await interaction.response.send_message("Now thread-unarchiving automatically")
-
-
-@tree.command(description="Grants Top 10 rank with accounting for time")
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.checks.bot_has_permissions(manage_roles=True)
-@app_commands.context_menu(name="Bestow Top 10")
-async def grant_top_10(interaction: discord.Interaction, user: discord.Member):
-    await interaction.response.send_message(view=GrantRankView(user, RANK_ID_DICT[RANK_LIST[0]]), ephemeral=True)
-
-
-# Alternative to fancier options
-@tree.command(description="Grants rank with accounting for time. Includes #1 ranks")
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.checks.bot_has_permissions(manage_roles=True)
-@app_commands.describe(
-    user_id='ID of member to grant rank to (enable developer tools and right-click user -> copy ID)',
-    rank='Rank to grant member',
-    seasonNum='Which number season end (mid-season = previous season)',
-    note='Miscellaneous note to attach to this record'
-)
-@app_commands.choices(rank=RANK_CHOICES)
-async def grant_rank(interaction: discord.Interaction, user_id: int, rank: app_commands.Choice, season_num: int,
-                     note: Optional[str] = ""):
-    time_added = int(datetime.timestamp(datetime.now(timezone.utc)))
-    await add_record(interaction, time_added, user_id, rank.value, season_num, note)
-
-
-@tree.command(description="Edit current season end date and time")
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.describe(
-    seasonNum='Current number season whose end is coming up',
-    endDate='Day (UTC) of season end in YYYY/MM/DD format',
-    endTime='Time (UTC) of season end in HH:MM 24hr format',
-)
-async def set_season_end(interaction: discord.Interaction, seasonNum: int, endDate: str, endTime: str = USUAL_END_TIME):
-    try:
-        end_datetime = datetime.strptime(endDate + " " + endTime, TIME_FORMAT)
-        endTimestamp = int(datetime.timestamp(end_datetime))
-
-        cur.execute(
-            "INSERT OR REPLACE INTO current_season_end (singleton, season_num, end_timestamp) VALUES (?, ?, ?)",
-            (0, seasonNum, endTimestamp)
-        )
-        conn.commit()
-        await interaction.guild.fetch_channel(SERVER_COMM_CH).send(
-            f"Current season set to S{seasonNum}, end set to {datetime.strftime(end_datetime, TIME_FORMAT)} UTC")
-
-    except ValueError:
-        await interaction.response.send_message("Invalid datetime provided, please check format", ephemeral=True)
-
-
-@tree.command(description="Lists users in the ranks database, oldest first")
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.checks.bot_has_permissions(send_messages=True)
-async def show_user_ranks(interaction: discord.Interaction):
-    with open("show_ranks.txt", 'w') as show_ranks:
-        show_ranks.write(header_line())
-
-        cur.execute("SELECT time_added, user_id, rank, season_num, note FROM ranks_added")
-        row_list = []
-        for row in cur.fetchall():
-            time_added, user_id, rank, num, note = row
-            name = interaction.guild.get_member(user_id).display_name
-            expires = expiry(rank, num)
-            row_list.append([time_added, name, rank, expires, note])
-
-        row_list.sort(key=lambda ls: (ls[3], ls[0]))
-        for index, row in enumerate(row_list):
-            _, name, rank, expires, note = row
-            show_ranks.write(line_to_write(index, name, rank, expires, note))
-
-        await interaction.response.send_message(file=show_ranks, view=ShowRanksView(row_list))
+        showcase = interaction.guild.get_channel(interaction.channel_id)
+        gallery = interaction.guild.get_channel(showcase_dict['gallery'])
+        active = interaction.guild.get_channel(showcase_dict['active'])
+        archive = interaction.guild.get_channel(ARCHIVE_CATEGORY)
+        if not showcase or not active or not archive or not active.type == discord.ChannelType.category or not archive.type == discord.ChannelType.category:
+            await interaction.response.send_message("Invalid data stored for showcase channel.", ephemeral=True)
+            return
+        if showcase.category == archive:
+            if gallery:
+                await gallery.edit(category=active)
+            await showcase.edit(category=active)
+            await interaction.response.send_message("Moved channel to active category!", ephemeral=True)
+        else:
+            if gallery:
+                await gallery.edit(category=archive)
+            await showcase.edit(category=archive)
+            await interaction.response.send_message("Moved channel to archive category!", ephemeral=True)
 
 
 # Helper function for refactoring
@@ -219,19 +104,29 @@ async def on_message(message: discord.Message):
         if len(message.content) > 4 and message.content == prev[-1].content and all(
                 channel_id != msg.channel.id for msg in prev):
             prev.append(message)
-            if len(prev) >= limit and len(message.author.roles) <= 1:  # only Commanders role
-                await message.author.ban(reason=f"spammed {limit} times")
-                bots_channel = message.author.guild.get_channel(SERVER_COMM_CH)
-                dm_message = f"You have been banned from the server {message.author.guild.name} for spamming in channels. This is to guard against link scams. However, if your message was not a scam, you should be unbanned shortly.\n\nIf you have recovered and secured your account, send a friend request to the Discord user '{message.author.guild.owner.name}' and you may be unbanned."
-                await message.author.send(dm_message)
-                await bots_channel.send(
-                    f"Banned {message.author.mention} who joined <t:{round(message.author.joined_at.timestamp())}:f> for spamming {limit} times \nMessage: {'`' + message.clean_content + '`'}\n\nSent to user in DMs: {dm_message}")
+            if len(prev) >= limit:
+                guild = message.author.guild
+                bots_channel = guild.get_channel(SERVER_COMM_CH)
+                if len(message.author.roles) <= 1:  # only Commanders role
+                    await message.author.ban(reason=f"spammed {limit} times")
+                    dm_message = f"You have been banned from the server {guild.name} for spamming in channels. This is to guard against link scams. However, if your message was not a scam, you should be unbanned shortly.\n\nIf you have recovered and secured your account, send a friend request to the Discord user '{guild.owner.name}' and you may be unbanned."
+                    await message.author.send(dm_message)
+                    await bots_channel.send(
+                        f"Banned {message.author.mention} who joined <t:{round(message.author.joined_at.timestamp())}:f> for spamming {limit} times \nMessage: {'`' + message.clean_content() + '`'}\n\nSent to user in DMs: {dm_message}")
+                else:
+                    await bots_channel.send(
+                        f"{guild.get_role(MOD_ROLE_ID).mention} {guild.get_role(STAFF_ROLE_ID).mention} Potential spam detected from member {message.author.mention} who has multiple roles")
         else:
             last_msgs[message.author.id] = [message]
 
     else:
         last_msgs[message.author.id] = [message]
     ##
+
+    if message.content.startswith("/sync") and message.author.guild_permissions.manage_guild:
+        bot.tree.copy_global_to(guild=message.guild)
+        synced = await bot.tree.sync(guild=message.guild)
+        await message.reply(f"Synced {len(synced)} app commands in guild {message.guild}")
 
 
 @bot.event
@@ -240,29 +135,11 @@ async def on_message_edit(before, after):
 
 
 @bot.event
-async def on_thread_update(before: discord.Thread, after: discord.Thread):
-    cur.execute("SELECT channelthread_id FROM threads_persist")
-    c_ids = list(cur.fetchall())
-    if not before.archived and after.archived and not after.archiver_id and not after.locked \
-            and (after.parent_id in c_ids or after.id in c_ids):
-        await after.edit(archived=False)
-
-
-@bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
-    if payload.member.get_role(STAFF_ROLE_ID):
-        guild = bot.get_guild(payload.guild_id)
-        channel = guild.get_channel(payload.channel_id)
-        msg = await channel.fetch_message(payload.message_id)
-        rank_react = [react for react in msg.reactions if react.emoji.id == payload.emoji.id][0]
-        staff_already = ""
-        if [user async for user in rank_react.users() if user.get_role(STAFF_ROLE_ID) and user.id != payload.member.id]:
-            staff_already = "A Staff member has already reacted to this post."
-        await channel.send(staff_already, view=GrantRankView(guild.get_member(payload.message_author_id),
-                                                             RANK_ID_DICT[REACTION_DICT[payload.emoji.id]]),
-                           ephemeral=True)
+    await rank_reaction_add(payload)
 
 
+# Don't know how to make this work, so just put it in on_message
 @bot.command()
 @commands.guild_only()
 @commands.is_owner()
@@ -275,7 +152,18 @@ async def sync(ctx):
 @bot.event
 async def on_ready():
     print(f"{bot.user.name} has connected to Discord!")
+    if not unarchiver.is_running():
+        unarchiver.start()
+    if not forum_closer.is_running():
+        forum_closer.start()
 
+
+# For persistent views
+async def setup_hook_with_views(self):
+    self.add_view(ExhibitionStartView())
+
+
+bot.setup_hook = types.MethodType(setup_hook_with_views, bot)
 
 # Start the bot
 bot.run(TOKEN)

@@ -320,3 +320,9 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/pycharm,macos,python
+
+# db no need to save right (?)
+*.db
+
+# folder for txt files sometimes generated for displaying data
+txt_views/
