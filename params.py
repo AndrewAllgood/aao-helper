@@ -67,11 +67,9 @@ if not os.path.exists(txt_views_dir):
 show_ranks_path = os.path.join(txt_views_dir, "show_ranks.txt")
 with open(show_ranks_path, 'w') as f:
     pass
-show_ranks_file = discord.File(show_ranks_path)
 deleted_ranks_path = os.path.join(txt_views_dir, "deleted_ranks.txt")
 with open(deleted_ranks_path, 'w') as f:
     pass
-deleted_ranks_file = discord.File(deleted_ranks_path)
 
 STAFF_ROLE_ID = 943827276104097842
 MOD_ROLE_ID = 659883868635267075

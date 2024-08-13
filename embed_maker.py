@@ -41,64 +41,6 @@ class CreateEmbedModal(discord.ui.Modal):
             await interaction.channel.send(embed=embed)
 
 
-"""
-@tree.command(description="Create or edit embed message (reply to edit)")
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.checks.bot_has_permissions(send_messages=True)
-@app_commands.describe(
-    title='Title header of embed (max 256 char)',
-    description='Body text of embed (max 4096 char)',
-    footer='Footer text of embed (max 2048 char)',
-    color='Color of embed siding (hex code)',
-    image='Large image below body (url to image)',
-)
-async def write_embed(interaction: discord.Interaction, title: str, description: str, footer: Optional[str] = None,
-                      color: Optional[str] = None, image: Optional[str] = None):
-    async def hex_str_to_int(hex_str: str):  # Helper function for color parameter
-        hex_str = hex_str.strip().strip("#")
-        for c in hex_str:
-            if c not in "0123456789abcdefABCDEF":  # characters that are valid in hexadecimal
-                await interaction.response.send_message("Color must be provided as valid hex code.", ephemeral=True)
-                return 0
-        return int(hex_str, 16)
-
-    err_msg = ""
-    if len(title) > TITLE_LIMIT:
-        err_msg += f"Character limit of title ({TITLE_LIMIT}) exceeded by {len(title) - TITLE_LIMIT}\n"
-
-    if len(description) > DESC_LIMIT:
-        err_msg += f"Character limit of description ({DESC_LIMIT}) exceeded by {len(description) - DESC_LIMIT}\n"
-
-    if footer and len(footer) > FOOTER_LIMIT:
-        err_msg += f"Character limit of footer ({FOOTER_LIMIT}) exceeded by {len(footer) - FOOTER_LIMIT}\n"
-
-    if err_msg:
-        await interaction.response.send_message(err_msg, ephemeral=True)
-        return
-
-    embed = discord.Embed(title=title, description=description, color=hex_str_to_int(color) if color else 0)
-    if footer: embed.set_footer(footer)
-    if image: embed.set_image(image)  # Note: have not added url validation for the image
-
-    target_msg = interaction.message.reference
-    content = interaction.message.content
-    if target_msg and target_msg.author == bot.user:
-        await target_msg.edit(embed=embed)
-        if content:
-            if re.match('^\s\s?$', content):
-                await interaction.response.send_message(
-                    "To help prevent accidental erasures, at least 3 spaces are required to delete non-embed message content.",
-                    ephemeral=True)
-            elif re.match('^\s\s\s+$', content):
-                await target_msg.edit(content=None)
-            else:
-                await target_msg.edit(content=content)
-
-    else:
-        await interaction.response.send_message(content=content, embed=embed)
-"""
-
-
 @tree.command(description="Create and send embed")
 @app_commands.checks.has_role(STAFF_ROLE_ID)
 @app_commands.checks.bot_has_permissions(send_messages=True)

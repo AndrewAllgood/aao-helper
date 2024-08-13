@@ -156,6 +156,8 @@ async def on_ready():
         unarchiver.start()
     if not forum_closer.is_running():
         forum_closer.start()
+    if not auto_update_season.is_running():
+        auto_update_season.start()
 
 
 # For persistent views

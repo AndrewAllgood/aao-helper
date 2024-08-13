@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import tasks
 from typing import Optional
 import re
+import csv
 import datetime as datetime_module  # stupid aspect of datetime being also an object
 from datetime import datetime, timezone, timedelta
 
@@ -15,7 +16,7 @@ SEASON_END_WEEKS = 5.0  # Weeks before a season ends where it counts as already 
 USUAL_END_TIME = "17:00"  # Usual end time in UTC for season end
 SEASON_START_WEEKS = 5.0  # Weeks after a new season starts where ranks cannot be assigned for the new season
 
-RANK_LIST = ["Top 10", "Platinum", "Gold", "Silver", "Bronze"]
+RANK_LIST = ["Top 10", "Platinum", "Gold", "Silver", "Bronze"]  # These must not contain commas for upload_ranks() to work
 RANK1_LIST = ["#1 Rank Axis", "#1 Rank Allies"]
 RANK_DICT = {
     733500181601058896: RANK_LIST[0],
@@ -55,8 +56,13 @@ if True:
 RANK_ID_DICT = {v: k for k, v in RANK_DICT.items()}
 RANK_CHOICES = [app_commands.Choice(name=rank, value=str(role_id)) for role_id, rank in RANK_DICT.items()]
 
-HEADER_LINE = "#   User                             Rank      Expires   Note"
+HEADER_LINE = "#     Discord Username              Rank            Season #   Note"
 
+
+def line_to_write(index: int, name: str, rank: str, season_num: int, note: str) -> str:
+    return "".join([str(index + 1), " " * (4 - len(str(index + 1)) + ": ", name, "," + " " * (33 - len(name)),
+                            rank, "," + " " * (15 - len(rank)), str(season_num), "," + " " * (10 - len(str(season_num))), note)])
+#TODO sort by expiry but make column season num
 
 def is_top_10_role_id(role_id):
     return role_id in [RANK_ID_DICT[RANK_LIST[0]]] + [RANK_ID_DICT[r_name] for r_name in RANK1_LIST]
@@ -81,6 +87,18 @@ def expiry_back(role_id: int, current_season: int) -> int:
         return current_season - TOP_TIME
     else:
         return current_season - MEDAL_TIME
+
+
+async def delete_rank(guild, time_added, user_id, rank, commits=True):
+    cur.execute(
+        "DELETE FROM ranks_added WHERE time_added = (?)",
+        (time_added,)
+    )
+    if commits:
+        conn.commit()  # if, for faster performance in loop
+    role = guild.get_role(RANK_ID_DICT[rank])
+    if role:
+        await guild.get_member(user_id).remove_roles(role)
 
 
 async def add_record(interaction: discord.Interaction, time_added: int, user_id: int, role_id: int, season_num: int,
@@ -183,9 +201,7 @@ class NoteTakeModal(discord.ui.Modal):
         self.view.set_note(self.children[0].value)
 
 
-# TODO: This is useless, make new season number options presenter
 def season_select_options() -> list[discord.SelectOption]:
-    print("select options func called")
     cur.execute("SELECT season_num FROM current_season_end")
     current_end = cur.fetchone()
     if not current_end:
@@ -205,18 +221,22 @@ class GrantRankView(discord.ui.View):
         self.role_id = role_id
         self.note = ""
 
+        self.select = discord.ui.Select(
+            row=0,
+            options=season_select_options(),
+            min_values=1,
+            max_values=1,
+            placeholder="Select season end (mid-season = previous season)"
+        )
+        self.select.callback = self.select_callback
+        self.add_item(self.select)
+
     def set_note(self, note):
         self.note = note
 
-    @discord.ui.select(
-        row=0,
-        options=season_select_options(),
-        min_values=1,
-        max_values=1,
-        placeholder="Select season end (mid-season = previous season)"
-    )
-    async def select_callback(self, interaction, select):
-        self.seasonNum = int(select.values[0])
+    async def select_callback(self, interaction):
+        await interaction.response.defer()
+        self.seasonNum = int(self.select.values[0])
 
     @discord.ui.button(
         row=1,
@@ -233,22 +253,6 @@ class GrantRankView(discord.ui.View):
     )
     async def button_callback_2(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(NoteTakeModal(self, title="Miscellaneous Note"))
-
-
-def line_to_write(index: int, name: str, rank: str, expires: int, note: str) -> str:
-    return "".join([str(index + 1), " " * (4 - len(str(index + 1)), name, " " * (33 - len(name)), rank, " " * (10 - len(rank)), str(expires), " " * (10 - len(str(expires))), note)])
-
-
-async def delete_rank(guild, time_added, user_id, rank, commits=True):
-    cur.execute(
-        "DELETE FROM ranks_added WHERE time_added = (?)",
-        (time_added,)
-    )
-    if commits:
-        conn.commit()  # if, for faster performance in loop
-    role = guild.get_role(RANK_ID_DICT[rank])
-    if role:
-        await guild.get_member(user_id).remove_roles(role)
 
 
 class DeleteRanksModal(discord.ui.Modal):
@@ -283,19 +287,18 @@ class DeleteRanksModal(discord.ui.Modal):
                 user_id = cur.fetchone()[1]
                 await delete_rank(interaction.guild, row[0], user_id, row[2], False)
             conn.commit()
-            with open(deleted_ranks_path, 'r+') as deleted_ranks:
+            with open(deleted_ranks_path, 'r+') as deleted_ranks: #TODO
                 deleted_ranks.write(HEADER_LINE)
                 for index, row in enumerate(row_range):
-                    _, name, rank, expires, note = row
-                    deleted_ranks.write(line_to_write(index, name, rank, expires, note))
-                await server_comm_ch.send(content="Deleted the following records:",
-                                                                           file=deleted_ranks_file)
+                    _, name, rank, num, note = row
+                    deleted_ranks.write(line_to_write(index, name, rank, num, note))
+                await server_comm_ch.send(content="Deleted the following records:", file=discord.File(deleted_ranks_path))
             await interaction.response.send_message(
                 f"Deleted {len(row_range)} records. Check {server_comm_ch.mention} for trace.",
                 ephemeral=True)
         elif index1:
             i1 = int(index1) - 1
-            time_added, name, rank, expires, note = self.row_list[i1]
+            time_added, name, rank, num, note = self.row_list[i1]
             cur.execute(
                 "SELECT FROM ranks_added WHERE time_added = (?)",
                 (time_added,)
@@ -303,7 +306,7 @@ class DeleteRanksModal(discord.ui.Modal):
             user_id = cur.fetchone()[1]
             await delete_rank(interaction.guild, time_added, user_id, rank)
             await interaction.response.send_message(
-                f"Deleted 1 record.\n\n{HEADER_LINE}\n{line_to_write(i1, name, rank, expires, note)}",
+                f"Deleted 1 record.\n\n{HEADER_LINE}\n{line_to_write(i1, name, rank, num, note)}",
                 ephemeral=True)
         else:
             await interaction.response.send_message("No number(s) provided", ephemeral=True)
@@ -315,8 +318,8 @@ class ShowRanksView(discord.ui.View):
         self.row_list = row_list
 
     @discord.ui.button(
-        label="Delete",
-        style=discord.ButtonStyle.danger
+        label="Delete Rows",
+        style=discord.ButtonStyle.secondary
     )
     async def button_callback(self, interaction: discord.Interaction, button):
         await interaction.response.send_modal(DeleteRanksModal(self.row_list, title="Delete Records"))
@@ -348,7 +351,7 @@ tree.add_command(grant_top_10)
 )
 @app_commands.choices(rank=RANK_CHOICES)
 async def grant_rank(interaction: discord.Interaction, user_id: str, rank: app_commands.Choice[str], season_num: int,
-                     note: Optional[str] = ""):
+                     note: Optional[str] = ""): #TODO allow username use
     try:
         user = interaction.guild.get_member(int(user_id))
         if not user:
@@ -362,10 +365,24 @@ async def grant_rank(interaction: discord.Interaction, user_id: str, rank: app_c
     await add_record(interaction, time_added, int(user_id), int(rank.value), season_num, note)
 
 
+@tree.command(description="Show current season end date and time")
+async def get_season_end(interaction: discord.Interaction):
+    cur.execute(
+        "SELECT season_num, end_timestamp FROM current_season_end WHERE guild_id = (?)",
+        (interaction.guild_id,)
+    )
+    current_end = cur.fetchone()
+    if not current_end:
+        await interaction.response.send_message(f"No season end setting found for {interaction.guild.name}")
+        return
+    season_num, end_ts = current_end
+    end_datetime = datetime.fromtimestamp(end_ts, timezone.utc)
+    await interaction.response.send_message(f"Current season set to S{season_num}, end set to {datetime.strftime(end_datetime, TIME_FORMAT)} UTC")
+
+
 OVERRIDE_CODE = "beamdog"
 
 
-#  fully automate or how to have manual?
 @tree.command(description="Edit current season end date and time")
 @app_commands.checks.has_any_role(MOD_ROLE_ID, BEAMDOG_ROLE_ID)
 @app_commands.describe(
@@ -376,7 +393,7 @@ OVERRIDE_CODE = "beamdog"
 async def set_season_end(interaction: discord.Interaction, season_num: int, end_date_time: str, override_code: Optional[str] = None):
     try:
         g_id = interaction.guild_id
-        end_datetime = datetime.strptime(end_date_time, TIME_FORMAT)
+        end_datetime = datetime.strptime(end_date_time, TIME_FORMAT).replace(tzinfo=timezone.utc)
         end_timestamp = int(datetime.timestamp(end_datetime))
 
         server_comm_ch = interaction.guild.get_channel_or_thread(SERVER_COMM_CH)
@@ -392,18 +409,18 @@ async def set_season_end(interaction: discord.Interaction, season_num: int, end_
             c_num, end_ts = current_end
             if override_code != OVERRIDE_CODE:
                 if timedelta(seconds=0.0) < datetime.now(timezone.utc) - datetime.fromtimestamp(end_ts, timezone.utc) < timedelta(weeks=SEASON_START_WEEKS):
-                    interaction.response.send_message(
+                    await interaction.response.send_message(
                         f"Too early to update season. Wait until grace period of {SEASON_START_WEEKS} weeks is over, or use override code.",
                         ephemeral=True)
                     return
                 if not (season_num == c_num or season_num == c_num + 1):
-                    interaction.response.send_message(
+                    await interaction.response.send_message(
                         "Season number is neither this season nor next -- typo? Use override code if intended.",
                         ephemeral=True)
                     return
                 if datetime.fromtimestamp(end_timestamp, timezone.utc) - datetime.now(timezone.utc) < timedelta(
                         seconds=0.0):
-                    interaction.response.send_message(
+                    await interaction.response.send_message(
                         "End datetime provided is in the past -- typo? Use override code if intended.",
                         ephemeral=True)
                     return
@@ -413,6 +430,8 @@ async def set_season_end(interaction: discord.Interaction, season_num: int, end_
             (g_id, season_num, end_timestamp)
         )
         conn.commit()
+        if not auto_update_season.is_running():
+            auto_update_season.start()
         await server_comm_ch.send(
             f"Current season set to S{season_num}, end set to {datetime.strftime(end_datetime, TIME_FORMAT)} UTC")
         await interaction.response.send_message(f"Successfully set season end. See {server_comm_ch.mention}", ephemeral=True)
@@ -424,6 +443,8 @@ async def set_season_end(interaction: discord.Interaction, season_num: int, end_
 def flip_season(end_ts):
     month_flip = {2: 8, 8: 2}  # Alternate between Feb and Aug
     c_dt = datetime.fromtimestamp(end_ts, timezone.utc)
+    if c_dt.day > 28:
+        raise ValueError("Day is set higher than 28, which will fail for February.")
     new_year = c_dt.year
     new_month = month_flip[c_dt.month]
     if new_month == 2:
@@ -447,7 +468,7 @@ async def auto_update_season():
             if not server_comm_ch:
                 print(f"In auto_update_season(): SERVER_COMM_CH not found for guild: {guild.name}")
                 return
-            with open(deleted_ranks_path, 'r+') as deleted_ranks:
+            with open(deleted_ranks_path, 'r+') as deleted_ranks: #TODO
                 deleted_ranks.write(HEADER_LINE)
 
                 cur.execute("SELECT time_added, user_id, rank, season_num, note FROM ranks_added")
@@ -456,19 +477,19 @@ async def auto_update_season():
                 for index, row in enumerate(row_list):
                     time_added, user_id, rank, num, note = row
                     if num < expiry_back(RANK_ID_DICT[rank], c_num + 1):
-                        deleted_ranks.write(line_to_write(index, guild.get_member(user_id).display_name, rank, expiry(rank, num), note))
+                        deleted_ranks.write(line_to_write(index, guild.get_member(user_id).name, rank, expiry(rank, num), note))
                         await delete_rank(guild, time_added, user_id, rank, False)
                 conn.commit()
-                try:
-                    cur.execute(
-                        "REPLACE INTO current_season_end (guild_id, season_num, end_timestamp) VALUES (?, ?, ?)",
-                        (g_id, c_num + 1, flip_season(end_ts))
-                    )
-                    conn.commit()
-                    await server_comm_ch.send("Auto-updated season end!")
-                except ValueError:
-                    await server_comm_ch.send("Error updating season end, use slash command `/set_season_end` to manually update it.")
-                await server_comm_ch.send("Deleted ranks:", file=deleted_ranks_file)
+            try:
+                cur.execute(
+                    "REPLACE INTO current_season_end (guild_id, season_num, end_timestamp) VALUES (?, ?, ?)",
+                    (g_id, c_num + 1, flip_season(end_ts))
+                )
+                conn.commit()
+                await server_comm_ch.send("Auto-updated current season to S{season_num}, end set to {datetime.strftime(end_datetime, TIME_FORMAT)} UTC\nDeleted ranks:", file=discord.File(deleted_ranks_path))
+            except ValueError as e:
+                await server_comm_ch.send(f"{guild.get_role(MOD_ROLE_ID).mention} Error updating season end: ValueError: {e}\n\nUse slash command `/set_season_end` to manually update it.")
+                auto_update_season.stop()
 
 
 @auto_update_season.before_loop
@@ -480,22 +501,21 @@ async def before_auto_update_season():
 @app_commands.checks.has_role(STAFF_ROLE_ID)
 @app_commands.checks.bot_has_permissions(send_messages=True)
 async def show_user_ranks(interaction: discord.Interaction):
-    with open(show_ranks_path, 'r+') as show_ranks:
+    with open(show_ranks_path, 'r+') as show_ranks: #TODO
         show_ranks.write(HEADER_LINE)
         cur.execute("SELECT time_added, user_id, rank, season_num, note FROM ranks_added")
         row_list = []
         for row in cur.fetchall():
             time_added, user_id, rank, num, note = row
-            name = interaction.guild.get_member(user_id).display_name
-            expires = expiry(rank, num)
-            row_list.append([time_added, name, rank, expires, note])
+            row_list.append([time_added, interaction.guild.get_member(user_id).name, rank, num, note])
 
-        row_list.sort(key=lambda ls: (ls[3], ls[0]))
+        row_list.sort(key=lambda ls: (expiry(ls[2], ls[3]), ls[0]))
         for index, row in enumerate(row_list):
-            _, name, rank, expires, note = row
-            show_ranks.write(line_to_write(index, name, rank, expires, note))
+            _, name, rank, num, note = row
+            show_ranks.write(line_to_write(index, name, rank, num, note))
 
-        await interaction.response.send_message(file=show_ranks_file, view=ShowRanksView(row_list))
+        await interaction.response.send_message(f"Ranks stored in database, sorted by earliest expiration first. Expiry is Season +{MEDAL_TIME} if normal, +{TOP_TIME} if Top 10 type.",
+                                                file=discord.File(show_ranks_path), view=ShowRanksView(row_list))
 
 
 async def rank_reaction_add(payload: discord.RawReactionActionEvent):
