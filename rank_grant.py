@@ -26,6 +26,11 @@ RANK_DICT = {
     664624127617007618: RANK1_LIST[0],
     664624098311274506: RANK1_LIST[1]
 }
+LEGACY_ID_DICT = {
+    RANK_LIST[0]: 1008640979357663253,
+    RANK1_LIST[0]: 1008643621244895322,
+    RANK1_LIST[1]: 1008643621244895322
+}
 REACTION_DICT = {
     # <:platinum:667881631473860667><:gold:667881111149477905><:silver:667880684244828201><:bronze:667882292622000158>
     667881631473860667: RANK_LIST[1],
@@ -44,6 +49,7 @@ if DEBUG:
         943969266774978580: RANK1_LIST[0],
         943968858170081301: RANK1_LIST[1]
     }
+    LEGACY_ID_DICT = {}
     REACTION_DICT = {
         # <:platinum:940837874746675211> <:gold:940837874927038504><:silver:940837874851512340><:bronze:940837874948001822>
         940837874746675211: RANK_LIST[1],
@@ -83,7 +89,7 @@ def expiry_back(role_id: int, current_season: int) -> int:
         return current_season - MEDAL_TIME
 
 
-async def delete_rank(guild, time_added, user_id, rank, commits=True):
+async def delete_rank(guild, time_added: int, user_id: int, rank: str, commits=True):
     cur.execute(
         "DELETE FROM ranks_added WHERE time_added = ?",
         (time_added,)
@@ -91,8 +97,19 @@ async def delete_rank(guild, time_added, user_id, rank, commits=True):
     if commits:
         conn.commit()  # if, for faster performance in loop
     role = guild.get_role(RANK_ID_DICT[rank])
+    user = guild.get_member(user_id)
     if role:
-        await guild.get_member(user_id).remove_roles(role)
+        cur.execute(
+            "SELECT * FROM ranks_added WHERE user_id = ? AND rank = ?",
+            (user_id, rank)
+        )
+        if not cur.fetchall():
+            await user.remove_roles(role)
+        legacy = LEGACY_ID_DICT.get(rank)
+        if legacy:
+            await user.add_roles(guild.get_role(legacy), guild.get_role(HOF_ROLE_ID))
+    else:
+        await guild.get_channel_or_thread(SERVER_COMM_CH).send(f"ROLE NOT FOUND IN PROGRAM: {rank}")
 
 
 async def add_record(interaction: discord.Interaction, time_added: int, user_id: int, role_id: int, season_num: int,
