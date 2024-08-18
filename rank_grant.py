@@ -674,6 +674,12 @@ async def upload_user_ranks(interaction: discord.Interaction, file: discord.Atta
                 illformed_ranks.append(row)
                 continue
             match_members = await interaction.guild.query_members(name, limit=100)
+            if len(match_members) == 100:
+                lim_msg = f"WARNING: hit query limit of 100 for name: {name} (treated as a prefix)\nDesired user could have been left out"
+                if server_comm_ch:
+                    await server_comm_ch.send(lim_msg)
+                else:
+                    await interaction.followup.send(lim_msg, ephemeral=True)
             match_members = [mem for mem in match_members if (mem.nick == name or mem.global_name == name or mem.name == name) and not mem.bot]  # query must match whole name, not only prefix; member cannot be a bot
             if len(match_members) > 1:
                 dup_msg = f"Note: possible nickname duplicates found for usernames: {' '.join([m.name+' ('+m.display_name+'),' for m in match_members])}"
