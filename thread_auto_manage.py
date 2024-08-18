@@ -75,19 +75,21 @@ async def auto_unarchive(interaction: discord.Interaction):
 @app_commands.checks.bot_has_permissions(manage_threads=True)
 async def forum_closer():
     cur.execute("SELECT forum_id, days_wait, lock FROM forum_posts_close")
-    all_forums = [f for f in cur.fetchall()]
+    all_forums = cur.fetchall()
     if not all_forums:
         return
     for guild in bot.guilds:
         for f_id, days, lock in all_forums:
             forum = guild.get_channel_or_thread(f_id)
-            if not forum or forum.type not in [discord.ChannelType.forum]:
-                print(f"Error with forum ID {f_id}")
+            if not forum:
+                continue
+            elif forum.type not in [discord.ChannelType.forum]:
+                print(f"Error: channel with ID {f_id} not forum type")
                 continue
             else:
-                for th in forum.threads():
-                    last_msg = [m for m in th.history(limit=1)][0]
-                    if datetime.now(timezone.utc) - last_msg.created_at() > timedelta(days=days):
+                for th in forum.threads:
+                    last_msg = [m async for m in th.history(limit=1)][0]
+                    if datetime.now(timezone.utc) - last_msg.created_at > timedelta(days=days):
                         if lock:
                             await th.edit(archived=True, locked=True)
                         else:
@@ -115,6 +117,8 @@ async def auto_close_forum_posts(interaction: discord.Interaction, forum_id: str
     except ValueError:
         await interaction.response.send_message("Must enter a valid forum channel ID.", ephemeral=True)
         return
+    if isinstance(lock, app_commands.Choice):
+        lock = lock.value
     ch = interaction.guild.get_channel_or_thread(forum_id)
     if not ch or ch.type not in [discord.ChannelType.forum]:
         await interaction.response.send_message("Must enter a valid forum channel ID.", ephemeral=True)
@@ -130,14 +134,13 @@ async def auto_close_forum_posts(interaction: discord.Interaction, forum_id: str
             (forum_id,)
         )
         conn.commit()
-        await interaction.response.send_message(f"No longer closing posts in {ch.mention} automatically")
+        await interaction.response.send_message(f"Toggled: no longer closing posts in {ch.mention} automatically")
     else:
         cur.execute(
-            "INSERT INTO forum_posts_close (forum_id) VALUES (?)",
-            (forum_id, days_wait, lock.value)
+            "INSERT INTO forum_posts_close (forum_id, days_wait, lock) VALUES (?, ?, ?)",
+            (forum_id, days_wait, lock)
         )
         conn.commit()
-        print([t.name for t in ch.threads])
-        await interaction.response.send_message(f"Now closing posts in {ch.mention} automatically")
+        await interaction.response.send_message(f"Now closing posts in {ch.mention} automatically{', with lock posts' if lock else ''}")
 
 

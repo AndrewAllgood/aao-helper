@@ -13,7 +13,6 @@ TIME_FORMAT = "%Y/%m/%d %H:%M"
 MEDAL_TIME = 2  # Number of seasons until medallion rank expires (mid-season counted as previous)
 TOP_TIME = 3  # Number of seasons until Top 10 role expires
 SEASON_END_WEEKS = 5.0  # Weeks before a season ends where it counts as already that season end
-USUAL_END_TIME = "17:00"  # Usual end time in UTC for season end
 SEASON_START_WEEKS = 5.0  # Weeks after a new season starts where ranks cannot be assigned for the new season
 
 RANK_LIST = ["Top 10", "Platinum", "Gold", "Silver", "Bronze"]  # These must not contain commas for upload_ranks() to work
@@ -35,7 +34,7 @@ REACTION_DICT = {
     667882292622000158: RANK_LIST[4]
 }
 """Debugging in A&AO Test Server"""
-if True:
+if DEBUG:
     RANK_DICT = {
         1265216205459951668: RANK_LIST[0],
         943044793074847755: RANK_LIST[1],
@@ -56,13 +55,8 @@ if True:
 RANK_ID_DICT = {v: k for k, v in RANK_DICT.items()}
 RANK_CHOICES = [app_commands.Choice(name=rank, value=str(role_id)) for role_id, rank in RANK_DICT.items()]
 
-HEADER_LINE = "#     Discord Username              Rank            Season #   Note"
+HEADER_LINE = ["#", "Discord Username", "Rank", "Season #", "Note"]
 
-
-def line_to_write(index: int, name: str, rank: str, season_num: int, note: str) -> str:
-    return "".join([str(index + 1), " " * (4 - len(str(index + 1)) + ": ", name, "," + " " * (33 - len(name)),
-                            rank, "," + " " * (15 - len(rank)), str(season_num), "," + " " * (10 - len(str(season_num))), note)])
-#TODO sort by expiry but make column season num
 
 def is_top_10_role_id(role_id):
     return role_id in [RANK_ID_DICT[RANK_LIST[0]]] + [RANK_ID_DICT[r_name] for r_name in RANK1_LIST]
@@ -91,7 +85,7 @@ def expiry_back(role_id: int, current_season: int) -> int:
 
 async def delete_rank(guild, time_added, user_id, rank, commits=True):
     cur.execute(
-        "DELETE FROM ranks_added WHERE time_added = (?)",
+        "DELETE FROM ranks_added WHERE time_added = ?",
         (time_added,)
     )
     if commits:
@@ -104,12 +98,18 @@ async def delete_rank(guild, time_added, user_id, rank, commits=True):
 async def add_record(interaction: discord.Interaction, time_added: int, user_id: int, role_id: int, season_num: int,
                      note: str):
     await interaction.response.defer()
-    cur.execute("SELECT season_num, end_timestamp FROM current_season_end")
+    cur.execute(
+        "SELECT season_num, end_timestamp FROM current_season_end WHERE guild_id = ?",
+        (interaction.guild_id,)
+    )
     current_end = cur.fetchone()
     if not current_end:
         await interaction.followup.send("No current season end stored yet. Use slash command `/set_season_end`.", ephemeral=True)
         return
     c_num, end_ts = current_end
+    if not season_num:
+        await interaction.followup.send("Error in add_record(): season_num given as 0 or None.", ephemeral=True)
+        return
     if season_num > c_num:
         await interaction.followup.send(f"Provided season end number cannot be greater than current season number, which is: {c_num}", ephemeral=True)
         return
@@ -128,7 +128,7 @@ async def add_record(interaction: discord.Interaction, time_added: int, user_id:
             await interaction.followup.send("Note: since it's mid-season, the current season will be recorded as the previous season.", ephemeral=True)
 
     cur.execute(
-        "SELECT rank, season_num FROM ranks_added WHERE user_id = (?)",
+        "SELECT rank, season_num FROM ranks_added WHERE user_id = ?",
         (user_id,)
     )
     user_entries = sorted(cur.fetchall(), key=lambda pair: (height(pair[0]), expiry(pair[0], pair[1])), reverse=True)
@@ -148,11 +148,11 @@ async def add_record(interaction: discord.Interaction, time_added: int, user_id:
         await add_role(role_id)
         confirm_str = f"{rank_to_add} rank granted!\n"
     else:
-        for rank, season_num in user_entries:
+        for rank, s_n in user_entries:
             h_a = height(rank_to_add)
             h = height(rank)
             e_a = expiry(rank_to_add, season_num)
-            e = expiry(rank, season_num)
+            e = expiry(rank, s_n)
             if h_a <= h and e_a <= e:
                 if not confirm_str:
                     confirm_str = f"{rank_to_add} rank NOT granted, redundant...\n"
@@ -163,8 +163,8 @@ async def add_record(interaction: discord.Interaction, time_added: int, user_id:
                 if user.get_role(r_id):
                     await user.remove_roles(interaction.guild.get_role(r_id))
                 cur.execute(
-                    "DELETE FROM ranks_added WHERE user_id, rank, season_num = (?, ?, ?)",
-                    (user_id, rank, season_num)
+                    "DELETE FROM ranks_added WHERE user_id = ? AND rank = ? AND season_num = ?",
+                    (user_id, rank, s_n)
                 )
                 conn.commit()
                 if not confirm_str:
@@ -176,18 +176,116 @@ async def add_record(interaction: discord.Interaction, time_added: int, user_id:
                     confirm_str = f"{rank_to_add} rank granted!\n"
 
     cur.execute(
-        "SELECT rank, season_num, note FROM ranks_added WHERE user_id = (?)",
+        "SELECT rank, season_num, note FROM ranks_added WHERE user_id = ?",
         (user_id,)
     )
     entries = cur.fetchall()
     info_str = ""
     for entry in entries:
         r, s_n, n = entry
-        info_str += f"\n\nRank: {r}\nExpires: {expiry(r, s_n)}\nNote: {n}"
+        info_str += f"\n\nRank: {r}\nExpires: {SEASON_START_WEEKS} weeks after end of S{expiry(r, s_n)}\nNote: {n}"
 
     await interaction.followup.send(
-        f"{confirm_str}User's ranks recorded:\n\nUser: {interaction.guild.get_member(user_id).display_name}\n{info_str}",
+        f"{confirm_str}User's ranks recorded:\n\nUser: {interaction.guild.get_member(user_id).display_name}{info_str}",
         ephemeral=True)
+
+
+async def add_records(interaction: discord.Interaction, rows: list[tuple[int, int, int, int, str]], current_season_num: int, end_timestamp: int):
+    index = 0
+    with open(show_ranks_path, 'r+') as a_r, open(deleted_ranks_path, 'r+') as error_trace:
+        a_r.truncate(0)
+        error_trace.truncate(0)
+        added_ranks = csv.writer(a_r)
+        added_ranks.writerow(HEADER_LINE)
+        error_trace.write("Failed Adds")
+        for row in rows:
+            time_added, user_id, role_id, season_num, note = row
+            rank_to_add = RANK_DICT[role_id]
+            user = interaction.guild.get_member(user_id)
+            row_str = f"\n{user.name}, {rank_to_add}, {str(season_num)} -- "
+            if not season_num:
+                error_trace.write(row_str + "Error in add_record(): season_num given as 0 or None.")
+                continue
+            if season_num > current_season_num:
+                error_trace.write(row_str + f"Provided season end number cannot be greater than current season number, which is: {current_season_num}")
+                continue
+            if season_num < expiry_back(role_id, current_season_num):
+                error_trace.write(row_str + f"Provided season end number cannot be that far in the past for that rank. Current season: {current_season_num}")
+                continue
+            if datetime.now(timezone.utc) - datetime.fromtimestamp(end_timestamp, timezone.utc) > timedelta(weeks=SEASON_START_WEEKS):
+                error_trace.write(row_str + "Current season end setting is out of date. Wait for bot to auto-update it (preferred, as it can auto-delete ranks too) or use slash command `/set_season_end`.")
+                continue
+            if season_num == current_season_num:
+                if is_top_10_role_id(role_id) and datetime.fromtimestamp(end_timestamp, timezone.utc) - datetime.now(timezone.utc) > timedelta(seconds=0.0):
+                    error_trace.write(row_str + "Cannot grant Top 10 role for current season before season end.")
+                    continue
+                if datetime.fromtimestamp(end_timestamp, timezone.utc) - datetime.now(timezone.utc) > timedelta(weeks=SEASON_END_WEEKS):
+                    season_num -= 1
+                    if index == 0:
+                        await interaction.followup.send(
+                            "Note: since it's mid-season, the current season will be recorded as the previous season.",
+                            ephemeral=True)
+
+            cur.execute(
+                "SELECT rank, season_num FROM ranks_added WHERE user_id = ?",
+                (user_id,)
+            )
+            user_entries = sorted(cur.fetchall(), key=lambda pair: (height(pair[0]), expiry(pair[0], pair[1])),
+                                  reverse=True)
+
+            async def add_role(r_id):
+                await user.add_roles(interaction.guild.get_role(r_id))
+                cur.execute(
+                    "INSERT INTO ranks_added (time_added, user_id, rank, season_num, note) VALUES (?, ?, ?, ?, ?)",
+                    (time_added, user_id, rank_to_add, season_num, note)
+                )
+                conn.commit()
+
+            row_to_write = [index, user.name, rank_to_add, season_num, note]
+            if not user_entries:
+                await add_role(role_id)
+                added_ranks.writerow(row_to_write)
+                index += 1
+            else:
+                added = False
+                for rank, s_n in user_entries:
+                    h_a = height(rank_to_add)
+                    h = height(rank)
+                    e_a = expiry(rank_to_add, season_num)
+                    e = expiry(rank, s_n)
+                    if h_a <= h and e_a <= e:
+                        error_trace.write(row_str + f"{rank_to_add} rank NOT granted, redundant...")
+                        break  # this is why user_entries is reverse sorted
+                    elif h_a >= h and e_a >= e:
+                        r_id = RANK_ID_DICT[rank]
+                        if user.get_role(r_id):
+                            await user.remove_roles(interaction.guild.get_role(r_id))
+                        cur.execute(
+                            "DELETE FROM ranks_added WHERE user_id = ? AND rank = ? AND season_num = ?",
+                            (user_id, rank, s_n)
+                        )
+                        conn.commit()
+                        await add_role(role_id)
+                        if not added:
+                            added_ranks.writerow(row_to_write)
+                            index += 1
+                            added = True
+                        error_trace.write(row_str + f"Redundant {rank} rank removed because {rank_to_add} rank granted.")
+                    elif h_a > h and e_a < e or h_a < h and e_a > e:
+                        await add_role(role_id)
+                        if not added:
+                            added_ranks.writerow(row_to_write)
+                            index += 1
+                            added = True
+
+    server_comm_ch = interaction.guild.get_channel_or_thread(SERVER_COMM_CH)
+    if server_comm_ch:
+        await server_comm_ch.send(f"Granted {index} ranks! See file for list", file=discord.File(show_ranks_path))
+        await server_comm_ch.send(f"Any failed rank adds are listed in the file below", file=discord.File(deleted_ranks_path))
+        await interaction.followup.send(f"Successfully granted ranks. See {server_comm_ch.mention}", ephemeral=True)
+    else:
+        await interaction.followup.send(f"Granted {index} ranks. See file for list", file=discord.File(show_ranks_path))
+        await interaction.followup.send(f"Any failed rank adds are listed in the file below", file=discord.File(deleted_ranks_path))
 
 
 class NoteTakeModal(discord.ui.Modal):
@@ -201,12 +299,9 @@ class NoteTakeModal(discord.ui.Modal):
         self.view.set_note(self.children[0].value)
 
 
-def season_select_options() -> list[discord.SelectOption]:
-    cur.execute("SELECT season_num FROM current_season_end")
-    current_end = cur.fetchone()
-    if not current_end:
-        return [discord.SelectOption(label="No current season set", value="0")]
-    season_num = current_end[0]
+def season_select_options(season_num: int) -> list[discord.SelectOption]:
+    if not season_num:
+        return [discord.SelectOption(label="No current season set", value="")]
     return [discord.SelectOption(label=str(season_num), default=True)] + [
         discord.SelectOption(label=str(season_num - x))
         for x in range(1, TOP_TIME + 1)]
@@ -217,13 +312,15 @@ class GrantRankView(discord.ui.View):
         super().__init__()
         self.time_added = int(datetime.timestamp(datetime.now(timezone.utc)))
         self.user = user
-        self.seasonNum = 0
+        cur.execute("SELECT season_num FROM current_season_end")
+        current_end = cur.fetchone()
+        self.seasonNum = current_end[0] if current_end else None
         self.role_id = role_id
         self.note = ""
 
         self.select = discord.ui.Select(
             row=0,
-            options=season_select_options(),
+            options=season_select_options(self.seasonNum),
             min_values=1,
             max_values=1,
             placeholder="Select season end (mid-season = previous season)"
@@ -236,7 +333,7 @@ class GrantRankView(discord.ui.View):
 
     async def select_callback(self, interaction):
         await interaction.response.defer()
-        self.seasonNum = int(self.select.values[0])
+        self.seasonNum = int(self.select.values[0]) if self.select.values[0] else None
 
     @discord.ui.button(
         row=1,
@@ -269,9 +366,10 @@ class DeleteRanksModal(discord.ui.Modal):
             if not server_comm_ch:
                 await interaction.response.send_message("Error: SERVER_COMM_CH not found", ephemeral=True)
                 return
-            i1, i2 = int(index1) - 1, int(index2[1:]) - 1
-            if i1 >= i2:
+            i1, i2 = int(index1), int(index2[1:])
+            if i1 >= i2 or i2 >= len(self.row_list):
                 await interaction.response.send_message("Invalid range provided", ephemeral=True)
+                return
             row_range = self.row_list[i1:i2 + 1]
             if interaction.guild.get_role(MOD_ROLE_ID) not in interaction.user.roles:
                 for row in row_range:
@@ -281,35 +379,38 @@ class DeleteRanksModal(discord.ui.Modal):
                         return
             for row in row_range:
                 cur.execute(
-                    "SELECT FROM ranks_added WHERE time_added = (?)",
+                    "SELECT user_id FROM ranks_added WHERE time_added = ?",
                     (row[0],)
                 )
-                user_id = cur.fetchone()[1]
+                user_id = cur.fetchone()[0]
                 await delete_rank(interaction.guild, row[0], user_id, row[2], False)
             conn.commit()
-            with open(deleted_ranks_path, 'r+') as deleted_ranks: #TODO
-                deleted_ranks.write(HEADER_LINE)
+            with open(deleted_ranks_path, 'r+') as d_r:
+                d_r.truncate(0)
+                deleted_ranks = csv.writer(d_r)
+                deleted_ranks.writerow(HEADER_LINE)
                 for index, row in enumerate(row_range):
                     _, name, rank, num, note = row
-                    deleted_ranks.write(line_to_write(index, name, rank, num, note))
-                await server_comm_ch.send(content="Deleted the following records:", file=discord.File(deleted_ranks_path))
+                    deleted_ranks.writerow([index, name, rank, num, note])
+            await server_comm_ch.send(content="Deleted the following records:", file=discord.File(deleted_ranks_path))
             await interaction.response.send_message(
                 f"Deleted {len(row_range)} records. Check {server_comm_ch.mention} for trace.",
                 ephemeral=True)
         elif index1:
-            i1 = int(index1) - 1
+            i1 = int(index1)
+            if i1 >= len(self.row_list):
+                await interaction.response.send_message("Invalid index provided", ephemeral=True)
+                return
             time_added, name, rank, num, note = self.row_list[i1]
-            cur.execute(
-                "SELECT FROM ranks_added WHERE time_added = (?)",
-                (time_added,)
-            )
-            user_id = cur.fetchone()[1]
+            cur.execute("SELECT user_id FROM ranks_added WHERE time_added = ?", (time_added,))
+            user_id = cur.fetchone()[0]
             await delete_rank(interaction.guild, time_added, user_id, rank)
-            await interaction.response.send_message(
-                f"Deleted 1 record.\n\n{HEADER_LINE}\n{line_to_write(i1, name, rank, num, note)}",
-                ephemeral=True)
+            delete_msg = f"Deleted 1 user rank record.\n\n{','.join(HEADER_LINE)}\n{','.join([index1, name, rank, str(num), note])}"
+            if interaction.channel_id != SERVER_COMM_CH:
+                await interaction.response.send_message(delete_msg, ephemeral=True)
+            await interaction.guild.get_channel_or_thread(SERVER_COMM_CH).send(delete_msg)
         else:
-            await interaction.response.send_message("No number(s) provided", ephemeral=True)
+            await interaction.response.send_message("No index number(s) provided", ephemeral=True)
 
 
 class ShowRanksView(discord.ui.View):
@@ -322,6 +423,9 @@ class ShowRanksView(discord.ui.View):
         style=discord.ButtonStyle.secondary
     )
     async def button_callback(self, interaction: discord.Interaction, button):
+        if not interaction.user.get_role(STAFF_ROLE_ID):
+            await interaction.response.send_message("Need Staff role to press this button", ephemeral=True)
+            return
         await interaction.response.send_modal(DeleteRanksModal(self.row_list, title="Delete Records"))
 
 
@@ -344,31 +448,35 @@ tree.add_command(grant_top_10)
 @app_commands.checks.has_role(STAFF_ROLE_ID)
 @app_commands.checks.bot_has_permissions(manage_roles=True)
 @app_commands.describe(
-    user_id='ID of member to grant rank to (enable developer tools and right-click user -> copy ID)',
+    user_id='@mention or ID of member to grant rank to (for ID, enable developer tools and right-click user -> copy ID)',
     rank='Rank to grant member',
     season_num='Which number season end (mid-season = previous season)',
     note='Miscellaneous note to attach to this record'
 )
 @app_commands.choices(rank=RANK_CHOICES)
 async def grant_rank(interaction: discord.Interaction, user_id: str, rank: app_commands.Choice[str], season_num: int,
-                     note: Optional[str] = ""): #TODO allow username use
-    try:
-        user = interaction.guild.get_member(int(user_id))
-        if not user:
-            await interaction.response.send_message("Must provide valid user_id", ephemeral=True)
-            return
-    except ValueError:
-        await interaction.response.send_message("Must provide valid user_id", ephemeral=True)
+                     note: str = ""):
+    m = re.search(r"(\d+)", user_id)
+    if not m:
+        await interaction.response.send_message("Must provide a number for user_id (may be as @mention)", ephemeral=True)
         return
-
+    u_id = m.groups()[0]
+    if len(u_id) < 12:
+        await interaction.response.send_message("Number received as user_id was under 12 digits (arbitrary sanity check). If this was actually correct, please enter the number padded with leading 0's.",
+                                                ephemeral=True)
+        return
+    user = interaction.guild.get_member(int(u_id))
+    if not user:
+        await interaction.response.send_message("No user found for user_id", ephemeral=True)
+        return
     time_added = int(datetime.timestamp(datetime.now(timezone.utc)))
-    await add_record(interaction, time_added, int(user_id), int(rank.value), season_num, note)
+    await add_record(interaction, time_added, int(u_id), int(rank.value), season_num, note)
 
 
 @tree.command(description="Show current season end date and time")
 async def get_season_end(interaction: discord.Interaction):
     cur.execute(
-        "SELECT season_num, end_timestamp FROM current_season_end WHERE guild_id = (?)",
+        "SELECT season_num, end_timestamp FROM current_season_end WHERE guild_id = ?",
         (interaction.guild_id,)
     )
     current_end = cur.fetchone()
@@ -401,7 +509,7 @@ async def set_season_end(interaction: discord.Interaction, season_num: int, end_
             await interaction.response.send_message("Error: SERVER_COMM_CH not found", ephemeral=True)
             return
         cur.execute(
-            "SELECT season_num, end_timestamp FROM current_season_end WHERE guild_id = (?)",
+            "SELECT season_num, end_timestamp FROM current_season_end WHERE guild_id = ?",
             (g_id,)
         )
         current_end = cur.fetchone()
@@ -441,13 +549,13 @@ async def set_season_end(interaction: discord.Interaction, season_num: int, end_
 
 
 def flip_season(end_ts):
-    month_flip = {2: 8, 8: 2}  # Alternate between Feb and Aug
     c_dt = datetime.fromtimestamp(end_ts, timezone.utc)
     if c_dt.day > 28:
         raise ValueError("Day is set higher than 28, which will fail for February.")
     new_year = c_dt.year
-    new_month = month_flip[c_dt.month]
-    if new_month == 2:
+    new_month = c_dt.month + 6
+    if new_month > 12:
+        new_month %= 12
         new_year += 1
     new_dt = c_dt.replace(year=new_year, month=new_month)
     return int(datetime.timestamp(new_dt))
@@ -462,31 +570,33 @@ async def auto_update_season():
     for current_end in current_ends:
         g_id, c_num, end_ts = current_end
         guild = bot.get_guild(g_id)
-
+        new_num = c_num + 1
+        new_ts = flip_season(end_ts)
         if datetime.now(timezone.utc) - datetime.fromtimestamp(end_ts, timezone.utc) > timedelta(weeks=SEASON_START_WEEKS):
             server_comm_ch = guild.get_channel_or_thread(SERVER_COMM_CH)
             if not server_comm_ch:
                 print(f"In auto_update_season(): SERVER_COMM_CH not found for guild: {guild.name}")
                 return
-            with open(deleted_ranks_path, 'r+') as deleted_ranks: #TODO
-                deleted_ranks.write(HEADER_LINE)
+            with open(deleted_ranks_path, 'r+') as d_r:
+                d_r.truncate(0)
+                deleted_ranks = csv.writer(d_r)
+                deleted_ranks.writerow(HEADER_LINE)
 
                 cur.execute("SELECT time_added, user_id, rank, season_num, note FROM ranks_added")
-                row_list = [row for row in cur.fetchall()]
-                row_list.sort(key=lambda tup: (tup[3], tup[0]))
+                row_list = sorted(cur.fetchall(), key=lambda tup: (expiry(tup[2], tup[3]), tup[0]))
                 for index, row in enumerate(row_list):
                     time_added, user_id, rank, num, note = row
-                    if num < expiry_back(RANK_ID_DICT[rank], c_num + 1):
-                        deleted_ranks.write(line_to_write(index, guild.get_member(user_id).name, rank, expiry(rank, num), note))
+                    if num < expiry_back(RANK_ID_DICT[rank], new_num):
+                        deleted_ranks.writerow([index, guild.get_member(user_id).name, rank, num, note])
                         await delete_rank(guild, time_added, user_id, rank, False)
                 conn.commit()
             try:
                 cur.execute(
                     "REPLACE INTO current_season_end (guild_id, season_num, end_timestamp) VALUES (?, ?, ?)",
-                    (g_id, c_num + 1, flip_season(end_ts))
+                    (g_id, new_num, new_ts)
                 )
                 conn.commit()
-                await server_comm_ch.send("Auto-updated current season to S{season_num}, end set to {datetime.strftime(end_datetime, TIME_FORMAT)} UTC\nDeleted ranks:", file=discord.File(deleted_ranks_path))
+                await server_comm_ch.send(f"Auto-updated current season to S{new_num}, end set to {datetime.strftime(datetime.fromtimestamp(new_ts, timezone.utc), TIME_FORMAT)} UTC\nDeleted ranks:", file=discord.File(deleted_ranks_path))
             except ValueError as e:
                 await server_comm_ch.send(f"{guild.get_role(MOD_ROLE_ID).mention} Error updating season end: ValueError: {e}\n\nUse slash command `/set_season_end` to manually update it.")
                 auto_update_season.stop()
@@ -497,12 +607,14 @@ async def before_auto_update_season():
     await bot.wait_until_ready()
 
 
-@tree.command(description="Lists users in the ranks database, oldest first")
+@tree.command(description="Lists users in the ranks database, oldest first. Also provides button to Delete ranks")
 @app_commands.checks.has_role(STAFF_ROLE_ID)
 @app_commands.checks.bot_has_permissions(send_messages=True)
 async def show_user_ranks(interaction: discord.Interaction):
-    with open(show_ranks_path, 'r+') as show_ranks: #TODO
-        show_ranks.write(HEADER_LINE)
+    with open(show_ranks_path, 'r+') as s_r:
+        s_r.truncate(0)
+        show_ranks = csv.writer(s_r)
+        show_ranks.writerow(HEADER_LINE)
         cur.execute("SELECT time_added, user_id, rank, season_num, note FROM ranks_added")
         row_list = []
         for row in cur.fetchall():
@@ -512,10 +624,98 @@ async def show_user_ranks(interaction: discord.Interaction):
         row_list.sort(key=lambda ls: (expiry(ls[2], ls[3]), ls[0]))
         for index, row in enumerate(row_list):
             _, name, rank, num, note = row
-            show_ranks.write(line_to_write(index, name, rank, num, note))
+            show_ranks.writerow([index, name, rank, num, note])
 
-        await interaction.response.send_message(f"Ranks stored in database, sorted by earliest expiration first. Expiry is Season +{MEDAL_TIME} if normal, +{TOP_TIME} if Top 10 type.",
-                                                file=discord.File(show_ranks_path), view=ShowRanksView(row_list))
+    await interaction.response.send_message(f"Ranks stored in database, sorted by earliest expiration first. Expiry = Season # + {MEDAL_TIME} if normal, + {TOP_TIME} if Top 10 type.",
+                                            file=discord.File(show_ranks_path), view=ShowRanksView(row_list))
+
+
+@tree.command(description="Bulk grant ranks via csv-formatted txt file")
+@app_commands.checks.has_role(STAFF_ROLE_ID)
+@app_commands.describe(
+    file="/show_user_ranks format OR username, rank, season num, note (optional)"
+)
+async def upload_user_ranks(interaction: discord.Interaction, file: discord.Attachment):
+    await interaction.response.defer()
+    server_comm_ch = interaction.guild.get_channel_or_thread(SERVER_COMM_CH)
+    cur.execute(
+        "SELECT season_num, end_timestamp FROM current_season_end WHERE guild_id = ?",
+        (interaction.guild_id,)
+    )
+    current_end = cur.fetchone()
+    if not current_end:
+        await interaction.followup.send("No current season end stored yet. Use slash command `/set_season_end`.", ephemeral=True)
+        return
+    c_num, end_ts = current_end
+    time_added = int(datetime.timestamp(datetime.now(timezone.utc)))
+    await file.save(upload_ranks_path)
+    with open(upload_ranks_path, 'r') as u_r:
+        ranks_upload = csv.reader(u_r)
+        ranks = []
+        official_format = 0
+        illformed_ranks = []
+        bad_name_count = 0
+        for i, row in enumerate(ranks_upload):
+            if i == 0 and row == HEADER_LINE:
+                official_format = 1
+                continue
+            if official_format and len(row) != 5:
+                illformed_ranks.append(row)
+                continue
+            if len(row) < 3 or not official_format and len(row) > 4:
+                illformed_ranks.append(row)
+                continue
+            name = row[0+official_format].strip()
+            rank = row[1+official_format].strip()
+            season_num = row[2+official_format].strip()
+            note = row[3+official_format].strip() if len(row) == 4+official_format else ""
+
+            if rank not in RANK_ID_DICT.keys() or not season_num.isdigit():
+                illformed_ranks.append(row)
+                continue
+            match_members = await interaction.guild.query_members(name, limit=100)
+            match_members = [mem for mem in match_members if (mem.nick == name or mem.global_name == name or mem.name == name) and not mem.bot]  # query must match whole name, not only prefix; member cannot be a bot
+            if len(match_members) > 1:
+                dup_msg = f"Note: possible nickname duplicates found for usernames: {' '.join([m.name+' ('+m.display_name+'),' for m in match_members])}"
+                if server_comm_ch:
+                    await server_comm_ch.send(dup_msg)
+                else:
+                    await interaction.followup.send(dup_msg, ephemeral=True)
+            user = None
+            dup_nick = False
+            for mem in match_members:
+                if mem.name == name:
+                    user = mem
+                    break  # assumes mem.name is unique, since it should be username. This is why bots not allowed, because they can have discriminators still
+                if mem.display_name == name:
+                    if user:
+                        user = None  # if nickname is unique, can be used, but if duplicated, cannot
+                        dup_nick = True
+                    elif not dup_nick:
+                        user = mem
+            if not user:
+                bad_name_count += 1
+                illformed_ranks.append(row)
+                continue
+
+            ranks.append((time_added, user.id, RANK_ID_DICT[rank], int(season_num), note))
+
+    await add_records(interaction, ranks, c_num, end_ts)
+
+    if illformed_ranks:
+        with open(illformed_ranks_path, 'r+') as i_r:
+            i_r.truncate(0)
+            i_r_writer = csv.writer(i_r)
+            for row in illformed_ranks:
+                i_r_writer.writerow(row)
+        bad_names_msg = f"\nPrefer using usernames over nicknames. Names are case-sensitive.\n{bad_name_count} names provided were found not to be (non-bot) usernames or unique nicknames."
+        illform_msg = (f"\n\nSome rows in the file were of unexpected format. Were rank titles and season numbers correct?\nRank titles accepted: {', '.join(RANK_ID_DICT.keys())}"
+                       f"\nTip: use double quotes \" if comma is in an entry, and double double quotes \"\" if \" symbol is needed."
+                       f"\n{bad_names_msg}\nBelow are the ranks that were passed over altogether due to being ill-formed:")
+        if server_comm_ch:
+            await server_comm_ch.send(illform_msg, file=discord.File(illformed_ranks_path))
+        else:
+            await interaction.followup.send(illform_msg, file=discord.File(illformed_ranks_path))
 
 
 async def rank_reaction_add(payload: discord.RawReactionActionEvent):

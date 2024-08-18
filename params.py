@@ -70,6 +70,14 @@ with open(show_ranks_path, 'w') as f:
 deleted_ranks_path = os.path.join(txt_views_dir, "deleted_ranks.txt")
 with open(deleted_ranks_path, 'w') as f:
     pass
+illformed_ranks_path = os.path.join(txt_views_dir, "illformed_ranks.txt")
+with open(illformed_ranks_path, 'w') as f:
+    pass
+upload_ranks_path = os.path.join(txt_views_dir, "upload_ranks.txt")
+with open(upload_ranks_path, 'w') as f:
+    pass
+
+DEBUG = False
 
 STAFF_ROLE_ID = 943827276104097842
 MOD_ROLE_ID = 659883868635267075
@@ -122,7 +130,7 @@ SHOWCASE_CHANNELS = {
 }
 
 """Debugging in A&AO Test Server"""
-if True:
+if DEBUG:
     STAFF_ROLE_ID = 1265197758449713233
     MOD_ROLE_ID = 864690035915358258
     SERVER_COMM_CH = 1265198095860502671

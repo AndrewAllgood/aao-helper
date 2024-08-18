@@ -19,7 +19,7 @@ EXHIBITION_CHANNELS = {
 }
 
 """Debugging in A&AO Test Server"""
-if True:
+if DEBUG:
     EXHIBITION_CHANNELS = {
         975900061659701299: {
             'label': '1',
