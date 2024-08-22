@@ -47,7 +47,7 @@ cur.execute(
     CREATE TABLE IF NOT EXISTS current_season_end (
         guild_id INTEGER PRIMARY KEY,
         season_num INTEGER,
-        end_timestamp INTEGER
+        end_timestamp REAL
     )
     """
 )
