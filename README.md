@@ -90,7 +90,7 @@ Ranks not granted through the system, e.g. by Discord built-in role management, 
 
 Unless otherwise specified, Staff and only Staff role may use the following commands:
 
-`On rank react` In the request-rank channel, members post a screenshot of their profile with the rank for the season they want recorded. By reacting to this member's message with a medallion emoji, a select menu will pop up in the server-commands channel asking for which season the role should be granted.
+* `On rank react` In the request-rank channel, members post a screenshot of their profile with the rank for the season they want recorded. By reacting to this member's message with a medallion emoji, a select menu will pop up in the server-commands channel asking for which season the role should be granted.
 
 9. `/grant_rank` Invoke this anywhere to give a user a rank. This is the only way to grant #1 ranks. @mention or raw User ID may specify the user. Tip: if the member is not visible in the channel, you can get the proper @mention by pressing *space* after typing out @ and the username in full.
 
