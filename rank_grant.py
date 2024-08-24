@@ -812,6 +812,8 @@ async def upload_user_ranks(interaction: discord.Interaction, file: discord.Atta
 
 
 async def rank_reaction_add(payload: discord.RawReactionActionEvent):
+    if payload.channel_id != REQUEST_RANK_CH:
+        return
     if payload.member.get_role(STAFF_ROLE_ID):
         guild = bot.get_guild(payload.guild_id)
         author = guild.get_member(payload.message_author_id)
