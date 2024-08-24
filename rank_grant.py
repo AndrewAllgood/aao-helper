@@ -15,8 +15,9 @@ TOP_TIME = 3  # Number of seasons until Top 10 role expires
 SEASON_END_WEEKS = 5.0  # Weeks before a season ends where it counts as already that season end
 SEASON_START_WEEKS = 5.0  # Weeks after a new season starts where ranks cannot be assigned for the new season
 
-RANK_LIST = ["Top 10", "Platinum", "Gold", "Silver", "Bronze"]  # These must not contain commas for upload_ranks() to work
+RANK_LIST = ["Top 10", "Platinum", "Gold", "Silver", "Bronze", "Wood"]  # These must not contain commas for upload_ranks() to work
 RANK1_LIST = ["#1 Rank Axis", "#1 Rank Allies"]
+REQUEST_RANK_CH = 665017042146951188 #request-rank
 RANK_DICT = {
     733500181601058896: RANK_LIST[0],
     659913624315232276: RANK_LIST[1],
@@ -40,6 +41,7 @@ REACTION_DICT = {
 }
 """Debugging in A&AO Test Server"""
 if DEBUG:
+    REQUEST_RANK_CH = 864688826005454899 #general
     RANK_DICT = {
         1265216205459951668: RANK_LIST[0],
         943044793074847755: RANK_LIST[1],
