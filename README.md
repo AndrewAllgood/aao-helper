@@ -74,7 +74,7 @@ Note: Finals channels are often intended to have gallery-1 channels as their gal
 
 This section is to help implement the leaderboard ranking role granting system in the A&AO community server. The basic idea is that members may request a vanity role based on their highest recent leaderboard rank. Rather than let the ranks be valid indefinitely, it was decided that they should expire on a timetable as follows:
 
-* Top 10 rank or #1 ranks are only granted for season end and expire 3 seasons + 5 weeks later. Once expired, Legacy Top 10 oand/or Legacy #1 are granted.
+* Top 10 rank and #1 ranks are only granted for season end and expire 3 seasons + 5 weeks later. Once expired, Legacy Top 10 and/or Legacy #1 are granted.
 
 * Medallion ranks (Platinum - Wood) are granted for any time except the 5 weeks right after season start. If the rank was attained at season end or up to 5 weeks before, it expires 2 seasons + 5 weeks later. If the rank was attained in the middle of a season, i.e. between 5 weeks after start and 5 weeks before end, it expires remainder of season + 1 season + 5 weeks later, equivalent to if it were for the previous season end.
 
