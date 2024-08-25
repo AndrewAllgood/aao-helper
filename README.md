@@ -2,12 +2,6 @@
 
 Bot of utility functions for the Axis & Allies 1942 Online community Discord server. Originally designed by Andrew, I (AirDolphin98) have rebuilt it with various new features. 
 
-Donate to the authors:
-
-https://ko-fi.com/aallgood
-
-https://ko-fi.com/airdolphin98
-
 ## Overview
 
 So far, these are the main functions of the bot:
@@ -82,7 +76,7 @@ This section is to help implement the leaderboard ranking role granting system i
 
 * Top 10 rank or #1 ranks are only granted for season end and expire 3 seasons + 5 weeks later. Once expired, Legacy Top 10 oand/or Legacy #1 are granted.
 
-* Medallion ranks (Platinum - Bronze) are granted for any time except the 5 weeks right after season start. If the rank was attained at season end or up to 5 weeks before, it expires 2 seasons + 5 weeks later. If the rank was attained in the middle of a season, i.e. between 5 weeks after start and 5 weeks before end, it expires remainder of season + 1 season + 5 weeks later, equivalent to if it were for the previous season end.
+* Medallion ranks (Platinum - Wood) are granted for any time except the 5 weeks right after season start. If the rank was attained at season end or up to 5 weeks before, it expires 2 seasons + 5 weeks later. If the rank was attained in the middle of a season, i.e. between 5 weeks after start and 5 weeks before end, it expires remainder of season + 1 season + 5 weeks later, equivalent to if it were for the previous season end.
 
 This section implements a SQLite database that records roles granted and removes role when record is deleted. There is also a loop that auto-updates the season number, which is first manually set, 5 weeks after season end, and automatically removes roles and deletes records that have expired.
 
