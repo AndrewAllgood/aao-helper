@@ -72,29 +72,41 @@ Note: Finals channels are often intended to have gallery-1 channels as their gal
 
 ### Exhibition match
 
-7. `/init_exhibitions` Invoke this anywhere to send embeds to all the "exhibition match" channels with a permanent button that prompts the user to enter user pings, which assigns them Exhibition Match role and reserves the channel for them until the match is ended.
+7. `/init_exhibitions` Invoke this anywhere to send embeds to all the exhibition-match channels with a permanent button that prompts the user to enter user pings, which assigns them Exhibition Match role and reserves the channel for them until the match is ended.
 
 8. `/end_exhibitions` A player in an exhibition match invokes this in an ongoing match channel to end the match in that channel. 
 
 ## Ranked badge system
 
-9. `On rank react`
+This section is to help implement the leaderboard ranking role granting system in the A&AO community server. The basic idea is that members may request a vanity role based on their highest recent leaderboard rank. Rather than let the ranks be valid indefinitely, it was decided that they should expire on a timetable as follows:
 
-10. `/grant_rank`
+* Top 10 rank and #1 ranks are only granted for season end and expire 3 seasons + 5 weeks later. Once expired, Legacy Top 10 and/or Legacy #1 are granted.
 
-11. `User right-click -> Apps -> Bestow Top 10`
+* Medallion ranks (Platinum - Wood) are granted for any time except the 5 weeks right after season start. If the rank was attained at season end or up to 5 weeks before, it expires 2 seasons + 5 weeks later. If the rank was attained in the middle of a season, i.e. between 5 weeks after start and 5 weeks before end, it expires remainder of season + 1 season + 5 weeks later, equivalent to if it were for the previous season end.
 
-12. `/get_season_end`
+This section implements a SQLite database that records roles granted and removes role when record is deleted. There is also a loop that auto-updates the season number, which is first manually set, 5 weeks after season end, and automatically removes roles and deletes records that have expired.
 
-13. `/set_season_end`
+Ranks not granted through the system, e.g. by Discord built-in role management, will not be recorded in the database, so be sure to use the commands below to grant rank. Users who leave the server may still have records which will expire as normal; assuming there is an auto-role-restore upon server re-join, a clean-up check is implemented where such auto-role ranks are removed if no record is found.
 
-14. `/show_user_ranks`
+Unless otherwise specified, Staff and only Staff role may use the following commands:
 
-15. `/upload_user_ranks`
+* `On rank react` In the request-rank channel, members post a screenshot of their profile with the rank for the season they want recorded. By reacting to this member's message with a medallion emoji, a select menu will pop up in the server-commands channel asking for which season the role should be granted.
+
+9. `/grant_rank` Invoke this anywhere to give a user a rank. This is the only way to grant #1 ranks. @mention or raw User ID may specify the user. Tip: if the member is not visible in the channel, you can get the proper @mention by pressing *space* after typing out @ and the username in full.
+
+10. `User right-click -> Apps -> Bestow Top 10` (context menu command) Counterpart to `On rank react` for Top 10. Tip: first post a Hall of Fame embed with all the @mentions, then right-click the @mentions to bestow Top 10.
+
+11. `/get_season_end` Any member can invoke this to check the current season end. 
+
+12. `/set_season_end` Mod or Beamdog role can invoke this to manually set the current season end. There are various checks which can be bypassed with the override option. 
+
+13. `/show_user_ranks` Invoke this to generate a txt file of all the contents of the database in csv format, i.e. all ranks recorded. This view provides a delete button which allows you to manually delete a range of rows in the txt file. As a precaution, only Mod may delete rows older than 24 hours. Deleted rows will be printed back in a txt file in csv format. 
+
+14. `/upload_user_ranks` Invoke this to upload a txt file in csv format of ranks to insert into the database. Useful for re-inserting deleted roles or inserting a lot of users. Names are case-sensitive. Tip: csv format allows you to use commas `,` inside an entry if you surround it with double-quotes `"`, and to use a double-quote if you add an extra double-quote like `""`.
 
 ## Hall of fame embeds
 
-16. `hall_of_fame` This command group allows Staff to more easily post in "hall of fame" channel. These commands grant Hall of Fame role to all featured players. 
+16. `hall_of_fame` This command group allows Staff to more easily post in hall-of-fame channel. These commands grant Hall of Fame role to all featured players. 
 
     a. `top_10` Posts Top 10 Platinum embed for season end. If not for a just-ended season, it does not auto-grant ranks aside from Hall of Fame. 
 
