@@ -22,15 +22,15 @@ So far, these are the main functions of the bot:
 
 * System that lets people give themselves Exhibition Match role
 
-And the most sophisticated functionality:
+* System for granting leaderboard rank badges, storing them in a database, and updating with the ranked seasons. This is the most sophisticated functionality.
 
-* System for granting leaderboard rank badges, storing them in a database, and updating with the ranked seasons.
+* Commands that streamline the posting of typical Hall of Fame embeds and auto-managing the awarded roles to some extent
 
 The bot automates much of these processes and allows people who don't have perms such as manage channels/threads/roles to perform these actions.
 
 ## Setup
 
-I have set this up on a Pebblehost server. It's cheap and decent for bot hosting (as of 2024). You can link it to a GitHub repo and have it update the code upon every server restart.
+I have set this up on a Pebblehost server. It's cheap and decent for bot hosting (as of 2024). You can link it to a GitHub repo and have it update the code upon every server restart. Note: the actual repo linked to my host currently is combined with other bots; I copy-paste files between that and the standalone aao-helper repo.
 
 The main file which you run the program with is `aao_helper.py`
 
@@ -50,7 +50,7 @@ Setting the DEBUG variable in `params.py` to `True` allows you to test the bot w
 
 ## How to use
 
-The conmands for roll sides and create/edit embed should be fairly self-explanatory.
+The commands for roll sides and create/edit embed should be fairly self-explanatory.
 
 1. `/sides`
 
@@ -91,3 +91,13 @@ Note: Finals channels are often intended to have gallery-1 channels as their gal
 14. `/show_user_ranks`
 
 15. `/upload_user_ranks`
+
+## Hall of fame embeds
+
+16. `hall_of_fame` This command group allows Staff to more easily post in "hall of fame" channel. These commands grant Hall of Fame role to all featured players. 
+
+    a. `top_10` Posts Top 10 Platinum embed for season end. If not for a just-ended season, it does not auto-grant ranks aside from Hall of Fame. 
+
+    b. `tournament` Posts Tournament embed for Solos, Duos, or Blitz winners and finalists. The primary Champion roles are not managed by this, but the underlying Champions role is. Blitz tournament follows a dethrone policy as of 2024, so remember to manually remove the previous Blitz Champion's role, and the underlying Champion role if not champion in another tournament.
+
+    c. `league` Posts League Generals embed. Provides the option to cycle the Generals and Supreme Commander roles to the featured players, removing from other players. Choose this if for the current started League season.

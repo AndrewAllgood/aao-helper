@@ -101,7 +101,7 @@ async def delete_rank(guild, time_added: float, user_id: int, rank: str, commits
         (time_added,)
     )
     if commits:
-        conn.commit()  # if, for faster performance in loop
+        conn.commit()  # conditional, for faster performance in loop
     role = guild.get_role(RANK_ID_DICT[rank])
     user = guild.get_member(user_id)
     if role and user:
@@ -113,7 +113,7 @@ async def delete_rank(guild, time_added: float, user_id: int, rank: str, commits
             await user.remove_roles(role)
         legacy = LEGACY_ID_DICT.get(rank)
         if legacy:
-            await user.add_roles(guild.get_role(legacy), guild.get_role(HOF_ROLE_ID))
+            await user.add_roles(guild.get_role(legacy))
     else:
         await guild.get_channel_or_thread(SERVER_COMM_CH).send(f"ROLE NOT FOUND IN PROGRAM: {rank}")
 
@@ -247,7 +247,7 @@ async def add_record(interaction: discord.Interaction, time_added: float, user_i
             ephemeral=True)
 
 
-async def add_records(interaction: discord.Interaction, rows: list[tuple[int, int, int, int, str]], current_season_num: int, end_timestamp: float):
+async def add_records(interaction: discord.Interaction, rows: list[tuple[float, int, int, int, str]], current_season_num: int, end_timestamp: float):
     index = 0
     with open(show_ranks_path, 'r+') as a_r, open(deleted_ranks_path, 'r+') as error_trace:
         a_r.truncate(0)
@@ -525,45 +525,34 @@ class ShowRanksView(discord.ui.View):
 # Commands
 
 
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.default_permissions(manage_roles=True)
-@app_commands.checks.bot_has_permissions(manage_roles=True)
-@app_commands.context_menu(name="Bestow Top 10")
-async def grant_top_10(interaction: discord.Interaction, user: discord.Member):
-    await interaction.response.send_message(view=GrantRankView(user, RANK_ID_DICT[RANK_LIST[0]]), ephemeral=True)
-
-
-tree.add_command(grant_top_10)
-
-
 # Alternative to fancier options
-@tree.command(description="Grants rank with accounting for time. Includes #1 ranks")
+@tree.command(description="Grants rank with accounting for time. Includes #1 ranks. Can do many members at once.")
 @app_commands.checks.has_role(STAFF_ROLE_ID)
 @app_commands.checks.bot_has_permissions(manage_roles=True)
 @app_commands.describe(
-    user_id='@mention (press space at end) or ID of member to grant rank to (for ID, enable developer tools on your account)',
-    rank='Rank to grant member',
+    user_id='@mention (press space at end) or user ID of member(s) to grant rank to',
+    rank='Rank to grant member(s)',
     season_num='Which number season end (mid-season = previous season)',
     note='Miscellaneous note to attach to this record'
 )
 @app_commands.choices(rank=RANK_CHOICES)
 async def grant_rank(interaction: discord.Interaction, user_id: str, rank: app_commands.Choice[str], season_num: int,
                      note: str = ""):
-    m = re.search(r"(\d+)", user_id)
+    m = re.findall(r"(\d+)", user_id)
     if not m:
         await interaction.response.send_message("Must provide a number for user_id (may be as @mention)", ephemeral=True)
         return
-    u_id = m.groups()[0]
-    if len(u_id) < 12:
-        await interaction.response.send_message("Number received as user_id was under 12 digits (arbitrary sanity check). If this was actually correct, please enter the number padded with leading 0's.",
-                                                ephemeral=True)
-        return
-    user = interaction.guild.get_member(int(u_id))
-    if not user:
-        await interaction.response.send_message("No user found for user_id", ephemeral=True)
-        return
-    time_added = datetime.timestamp(datetime.now(timezone.utc))
-    await add_record(interaction, time_added, int(u_id), int(rank.value), season_num, note)
+    for u_id in m:
+        if len(u_id) < 12:
+            await interaction.response.send_message("Number received as user_id was under 12 digits (arbitrary sanity check). If this was actually correct, please enter the number padded with leading 0's.",
+                                                    ephemeral=True)
+            return
+        user = interaction.guild.get_member(int(u_id))
+        if not user:
+            await interaction.response.send_message("No user found for user_id", ephemeral=True)
+            return
+        time_added = datetime.timestamp(datetime.now(timezone.utc))
+        await add_record(interaction, time_added, int(u_id), int(rank.value), season_num, note)
 
 
 @tree.command(description="Show current season end date and time")
@@ -740,7 +729,7 @@ async def upload_user_ranks(interaction: discord.Interaction, file: discord.Atta
         await interaction.followup.send("No current season end stored yet. Use slash command `/set_season_end`.", ephemeral=True)
         return
     c_num, end_ts = current_end
-    time_added = datetime.timestamp(datetime.now(timezone.utc))
+    time_added = datetime.now(timezone.utc).timestamp()
     await file.save(upload_ranks_path)
     with open(upload_ranks_path, 'r') as u_r:
         ranks_upload = csv.reader(u_r)

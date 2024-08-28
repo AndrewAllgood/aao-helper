@@ -51,6 +51,7 @@ cur.execute(
     )
     """
 )
+cur.execute("DELETE FROM current_season_end")
 cur.execute(  # currently channel is expected to take a json serialized list of exhibition channel labels
     """
     CREATE TABLE IF NOT EXISTS exhibition_users (
@@ -77,13 +78,12 @@ upload_ranks_path = os.path.join(txt_views_dir, "upload_ranks.txt")
 with open(upload_ranks_path, 'w') as f:
     pass
 
-DEBUG = False
+DEBUG = True
 
 STAFF_ROLE_ID = 943827276104097842
 MOD_ROLE_ID = 659883868635267075
 BEAMDOG_ROLE_ID = 610480003230072833
 SERVER_COMM_CH = 670090977356021780 #server-logs
-HOF_ROLE_ID = 1008640154128367627
 
 TITLE_LIMIT = 256
 DESC_LIMIT = 4096
