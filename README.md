@@ -30,7 +30,7 @@ The bot automates much of these processes and allows people who don't have perms
 
 ## Setup
 
-I have set this up on a Pebblehost server. It's cheap and decent for bot hosting (as of 2024). You can link it to a GitHub repo and have it update the code upon every server restart. Note: the actual repo linked to my host currently is combined with other bots; I copy-paste files between that and the standalone aao-helper repo.
+I have set this up on a Pebblehost server. It's cheap and decent for bot hosting (as of 2024). You can link it to a GitHub repo and have it update the code upon every server restart. Note: the actual repo linked to my host currently is combined with other bots; I copy-paste files between that and this standalone aao-helper repo.
 
 The main file which you run the program with is `aao_helper.py`
 
