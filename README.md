@@ -66,9 +66,9 @@ Note: Finals channels are often intended to have gallery-1 channels as their gal
 
 ### Auto manage threads
 
-5. `/auto_unarchive` Invoke this in a thread to automatically unhide it when it would normally disappear from the channel list after the auto archive duration. Invoke in a channel to do this for all threads in that channel. Closed/locked threads will not be affected; auto archive does not register as archiving, it somehow only changes visibility. Note: if you restart the host server too frequently, this can clog up the audit log modifying threads whose last message was too long ago, so send a bump message in those threads if that's an issue.
+5. `/auto_unarchive` Invoke this in a thread to automatically unhide it when it would normally disappear from the channel list after the auto archive duration. Invoke in a channel to do this for all threads in that channel. Closed/locked threads will not be affected; auto archive does not register as archiving, it somehow only changes visibility. Note: if the host server restarts many times, this can clog up the Audit Log modifying threads with an old last message, so send a bump message in those threads if that's an issue.
 
-6. `/auto_close_forum_posts` Invoke this with a forum ID to have it automatically archive forum posts that have not had recent messages. Default cutoff is 14 days ago. Can also auto-lock if desired.
+6. `/auto_close_forum_posts` Invoke this with a forum ID to have it automatically archive forum posts that have not had recent messages. Default cutoff is `14` days ago. Can also auto-lock if desired.
 
 ### Exhibition match
 
