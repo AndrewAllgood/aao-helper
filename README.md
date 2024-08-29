@@ -24,7 +24,7 @@ So far, these are the main functions of the bot:
 
 * System for granting leaderboard rank badges, storing them in a database, and updating with the ranked seasons. This is the most sophisticated functionality.
 
-* Commands that streamline the posting of typical Hall of Fame embeds and auto-managing the awarded roles to some extent
+* Commands that streamline the posting of typical Hall of Fame embeds and auto-manage the awarded roles to some extent
 
 The bot automates much of these processes and allows people who don't have perms such as manage channels/threads/roles to perform these actions.
 
