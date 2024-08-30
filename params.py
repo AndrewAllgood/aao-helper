@@ -60,6 +60,14 @@ cur.execute(  # currently channel is expected to take a json serialized list of 
     """
 )
 conn.commit()
+"""Here's a tip on how to update a database schema: 
+Add the following after the create stmt:
+DROP TABLE table_name
+CREATE TABLE IF NOT EXISTS table name (...)
+Then run the updated code once to rewrite the db file.
+Can then update the code again with the old create stmt and the drop stmt removed for more conciseness.
+Note: this will of course delete the data in the table.
+"""
 
 txt_views_dir = "txt_views"
 if not os.path.exists(txt_views_dir):
