@@ -80,7 +80,7 @@ async def toggle_showcase(interaction: discord.Interaction):
 @app_commands.describe(
     limit='A cap on the number of mentions if Automod is a concern'
 )
-async def list_non_commanders_mem_pings(interaction: discord.Interaction, role: str, limit: Optional[int] = None):
+async def list_non_commanders_mem_pings(interaction: discord.Interaction, limit: Optional[int] = None):
     if interaction.channel_id != SERVER_COMM_CH:
         await interaction.response.send_message("Only callable in #server-commands channel so as not to mass ping", ephemeral=True)
         return
@@ -98,7 +98,7 @@ async def list_non_commanders_mem_pings(interaction: discord.Interaction, role: 
         if commanders_role not in mem.roles and not (staff_role in mem.roles or mem.bot):
             roleless.append(mem)
     report = ""
-    header = "Members missing Commanders role:\n"
+    header = "Members (not Staff or bot) missing Commanders role:\n"
     err_msg = "Truncated--too many members missing Commanders role..."
     for i, mem in enumerate(roleless):
         report_ = report + mem.mention + "\n"
