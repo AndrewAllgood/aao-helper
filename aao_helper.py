@@ -185,6 +185,8 @@ last_msgs = {}
 @bot.event
 async def on_message(message: discord.Message):
     await message_checks(message)
+    
+    shake_thread_on_msg(message)
 
     channel_id = message.channel.id
 

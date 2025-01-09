@@ -85,7 +85,8 @@ upload_ranks_path = os.path.join(txt_views_dir, "upload_ranks.txt")
 with open(upload_ranks_path, 'w') as f:
     pass
 
-DEBUG = False
+# Manually toggle for testbot
+DEBUG = True
 
 STAFF_ROLE_ID = 943827276104097842
 MOD_ROLE_ID = 659883868635267075
@@ -140,6 +141,8 @@ SHOWCASE_CHANNELS = {
 
 """Debugging in A&AO Test Server"""
 if DEBUG:
+    TOKEN = os.getenv('DISCORD_TESTBOT_TOKEN')
+
     STAFF_ROLE_ID = 1265197758449713233
     MOD_ROLE_ID = 864690035915358258
     COMMANDERS_ROLE_ID = 940238197307367444
