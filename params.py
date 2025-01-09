@@ -86,7 +86,7 @@ with open(upload_ranks_path, 'w') as f:
     pass
 
 # Manually toggle for testbot
-DEBUG = True
+DEBUG = False
 
 STAFF_ROLE_ID = 943827276104097842
 MOD_ROLE_ID = 659883868635267075
