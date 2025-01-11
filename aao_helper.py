@@ -1,7 +1,9 @@
 import asyncio
+import typing
+from doctest import debug_script
 
 import discord
-from discord import app_commands
+from discord import app_commands, Colour
 from discord.ext import tasks
 from typing import Optional
 import re
@@ -11,12 +13,16 @@ import asyncio
 import datetime as datetime_module  # stupid aspect of datetime being also an object
 from datetime import datetime, timezone, timedelta
 
+from announcement import *
 from params import *
 from rank_grant import *
 from embed_maker import *
 from exhibition import *
 from thread_auto_manage import *
 from hall_of_fame import *
+
+# Ensure we have a good entropy pool to get started
+random.seed(int.from_bytes(os.urandom(128), 'big'))
 
 
 @tree.command(description="Randomly assign sides for 2-5 players")
@@ -30,11 +36,23 @@ from hall_of_fame import *
 )
 async def sides(interaction: discord.Interaction, player_one: str, player_two: str, player_three: Optional[str] = None,
                 player_four: Optional[str] = None, player_five: Optional[str] = None):
+    if DEBUG:
+        print("sides command received")
     players = [player_one, player_two, player_three, player_four, player_five]
+    if DEBUG:
+        print(f"players: {players}")
     players = [x for x in players if x]
+    if DEBUG:
+        print(f"players: {players}")
     random.shuffle(players)
+    if DEBUG:
+        print(f"players: {players}")
     amount = len(players)
+    if DEBUG:
+        print(f"amount: {amount}")
     g = amount - 2
+    if DEBUG:
+        print(f"g: {g}")
     game_sides = [
         ['<:axis:665257614002749482>', '<:allies:665257668797267989>'],
         ['<:allies:665257668797267989>', '<:germany_aa:660218154286448676>', '<:japan_aa:660218154638901279>'],
@@ -44,8 +62,51 @@ async def sides(interaction: discord.Interaction, player_one: str, player_two: s
          '<:united_kingdom:660218154378854401>', '<:japan_aa:660218154638901279>',
          '<:united_states:660218154160619533>'],
     ]
-    await interaction.response.send_message('\n'.join(a + b for a, b in zip(game_sides[g], players)))
+    if DEBUG:
+        res = '\n'.join(a + b for a, b in zip(game_sides[g], players))
+        print(f"res: {res}\n\n")
+        await interaction.response.send_message(res)
+    else:
+        await interaction.response.send_message('\n'.join(a + b for a, b in zip(game_sides[g], players)))
 
+# Roll a six sided die. Optional user-input argument `amount`. if not specified, defaults to 1
+@tree.command(description='Rolls selected amount of d6 dice, or one d6 die if no integer is specified')
+@app_commands.checks.bot_has_permissions(send_messages=True)
+@app_commands.describe(amount='Amount of dice to roll. Leave empty for one')
+async def dice(interaction: discord.Interaction, amount: typing.Optional[int]):
+    if DEBUG:
+        print("dice command received")
+
+    amount = amount if amount else 1
+    # Empty list for each of the six dice
+    output = [0,0,0,0,0,0]
+    # i is an iterator used to repeat rolling a die `amount` of times
+    i = 0
+    while i < amount:
+        # Uses 0,5 rather than 1,6 because lists (arrays) are indexed starting from 0
+        # This effectively means the die roll outputs are incremented by one (in theory, not in the code)
+        die = random.randint(0,5)
+        output[die] += 1
+        i += 1
+
+    # List for emoji, to be zipped with the `output` next ...
+    emoji = [
+        "<:dice_one:665298149274943550>",
+        "<:dice_two:711992588709920779>",
+        "<:dice_three:711992763209744415>",
+        "<:dice_four:711992276724744253>",
+        "<:dice_five:711992019349799005>",
+        "<:dice_six:665298304732495892>"
+    ]
+
+    res: str = ""
+    for item in zip(emoji,output):
+        res += f"{str(item[0])} {str(item[1])}\n"
+
+    if DEBUG:
+        print(f'res: {res}')
+
+    await interaction.response.send_message(res)
 
 @tree.command(description="Moves showcase channel between cache and main category")
 @app_commands.checks.has_role(STAFF_ROLE_ID)
@@ -220,7 +281,8 @@ async def on_message(message: discord.Message):
 @bot.event
 async def on_message_edit(before, after):
     await message_checks(after)
-
+    before_embed = discord.Embed(title='Before Edit', type='rich', colour=discord.Colour.brand_red(), description=before.content[:1750])
+    after_embed = discord.Embed(title='After Edit', type='rich', colour=discord.Colour.brand_green(), description=after.content[:1750])
 
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
