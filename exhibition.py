@@ -54,7 +54,7 @@ def exhibition_init__embed(color):
 class ExhibitionStartView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.cancel_word = "cancel"
+        self.cancel_word = "cancel"  # lowercase
 
     @discord.ui.button(label='Create Match', style=discord.ButtonStyle.primary, custom_id='exhibition_start_view')
     async def create_match(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -78,7 +78,7 @@ class ExhibitionStartView(discord.ui.View):
 
         def check(msg: discord.Message):
             return msg.channel.id == ch_id and msg.author.id == interaction.user.id and (
-                    msg.mentions or self.cancel_word.lower() in msg.content.lower())
+                    msg.mentions or self.cancel_word in msg.content.lower())
 
         await interaction.followup.send(
             f"@ Mention all players who are to participate. Make sure to ping YOURSELF too if you are included. Or type `{self.cancel_word}` to cancel the command.",
