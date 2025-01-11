@@ -7,13 +7,13 @@ from typing import Optional
 import re
 import random
 import types
-import asyncio
 import datetime as datetime_module  # stupid aspect of datetime being also an object
 from datetime import datetime, timezone, timedelta
 
 from params import *
 from rank_grant import *
 from embed_maker import *
+from showcase import *
 from exhibition import *
 from thread_auto_manage import *
 from hall_of_fame import *
@@ -45,34 +45,6 @@ async def sides(interaction: discord.Interaction, player_one: str, player_two: s
          '<:united_states:660218154160619533>'],
     ]
     await interaction.response.send_message('\n'.join(a + b for a, b in zip(game_sides[g], players)))
-
-
-@tree.command(description="Moves showcase channel between cache and main category")
-@app_commands.checks.has_role(STAFF_ROLE_ID)
-@app_commands.checks.bot_has_permissions(manage_channels=True)
-async def toggle_showcase(interaction: discord.Interaction):
-    showcase_dict = SHOWCASE_CHANNELS.get(interaction.channel_id)
-    if not showcase_dict:
-        await interaction.response.send_message("Must be in a showcase channel.", ephemeral=True)
-        return
-    else:
-        showcase = interaction.guild.get_channel(interaction.channel_id)
-        gallery = interaction.guild.get_channel(showcase_dict['gallery'])
-        active = interaction.guild.get_channel(showcase_dict['active'])
-        archive = interaction.guild.get_channel(ARCHIVE_CATEGORY)
-        if not showcase or not active or not archive or not active.type == discord.ChannelType.category or not archive.type == discord.ChannelType.category:
-            await interaction.response.send_message("Invalid data stored for showcase channel.", ephemeral=True)
-            return
-        if showcase.category == archive:
-            if gallery:
-                await gallery.edit(category=active)
-            await showcase.edit(category=active)
-            await interaction.response.send_message("Moved channel to active category!", ephemeral=True)
-        else:
-            if gallery:
-                await gallery.edit(category=archive)
-            await showcase.edit(category=archive)
-            await interaction.response.send_message("Moved channel to archive category!", ephemeral=True)
 
 
 @tree.command(description="Ping all non-Staff, non-bot members who don't have Commanders role.")
@@ -126,13 +98,12 @@ class ConfirmDefaultsView(discord.ui.View):
         button.disabled = True
         await interaction.followup.edit_message(interaction.message.id, view=self)
         interaction_channel = interaction.channel
-        if not type(self).temp:
+        if not type(self).temp or type(self).temp not in interaction.guild.roles:
             type(self).temp = await interaction.guild.create_role(name="temp", reason="/push_channels_as_default")
         for ch in self.ch_list:
             await ch.set_permissions(interaction.guild.default_role, read_messages=False)
             await ch.set_permissions(type(self).temp, read_messages=True)
         
-        default_role = interaction.guild.default_role
         templess_mems = [mem for mem in interaction.guild.members if type(self).temp not in mem.roles]
         mem_count = len(interaction.guild.members)
         init_count = mem_count - len(templess_mems)
@@ -150,7 +121,7 @@ class ConfirmDefaultsView(discord.ui.View):
                     tenth += 1
                     await prog_msg.edit(content=prog_str(tenth))
             for ch in self.ch_list:
-                await ch.set_permissions(default_role, read_messages=True)
+                await ch.set_permissions(interaction.guild.default_role, read_messages=True)
             await type(self).temp.delete(reason="/push_channels_as_default")
             await interaction_channel.send("Channels should now be public and temp role deleted. Onboarding default for these channels should now be checked for each and every existing member!")
 
