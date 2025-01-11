@@ -92,28 +92,29 @@ class ExhibitionStartView(discord.ui.View):
             await interaction.followup.send("Command canceled.", ephemeral=True)
             await message.delete()
             return
-        for user in message.mentions:
+        for mem in [m for m in message.mentions if interaction.guild.get_member(m.id)]:
             cur.execute(
                 "SELECT user_id, channel FROM exhibition_users WHERE user_id = (?)",
-                (user.id,)
+                (mem.id,)
             )
-            participant = cur.fetchone()
+            participant = cur.fetchall()
             if not participant:
                 cur.execute(
                     "INSERT INTO exhibition_users (user_id, channel) VALUES (?, ?)",
-                    (user.id, json.dumps([ch_id]))
+                    (mem.id, json.dumps([exh_label]))
                 )
                 conn.commit()
             else:
-                p_ch_ids = json.loads(participant[1])
-                if ch_id not in p_ch_ids:
-                    p_ch_ids.append(ch_id)
+                _, ch_labels = participant[0]
+                ch_labels = json.loads(ch_labels)
+                if exh_label not in ch_labels:
+                    ch_labels.append(exh_label)
                     cur.execute(
                         "REPLACE INTO exhibition_users (user_id, channel) VALUES (?, ?)",
-                        (user.id, json.dumps(p_ch_ids))
+                        (mem.id, json.dumps(ch_labels))
                     )
                     conn.commit()
-            await user.add_roles(exh_role)
+            await mem.add_roles(exh_role)
 
         await interaction.followup.send(embed=exhibition_start__embed(exh_color))
 
