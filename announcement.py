@@ -2,6 +2,10 @@
 from params import *
 from discord import app_commands
 from datetime import datetime, timezone, timedelta
+import sqlite3
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Create and announcement and allow for it to be edited by any STAFF or BEAMDOG @spellignerror 11Jan2025
 class CreateAnnouncementModal(discord.ui.Modal):
@@ -42,7 +46,9 @@ class CreateAnnouncementModal(discord.ui.Modal):
                 await self.message.edit(embed=embed)
             else:
                 announcement_channel = bot.get_channel(ANNOUNCEMENT_CHANNEL)
-                await announcement_channel.send(embed=embed)
+                message = await announcement_channel.send(embed=embed)
+                cur.execute("INSERT INTO announcement_meta_data VALUES (?, ?)", (int(message.id), int(interaction.user.id)))
+                conn.commit()
         except discord.errors.HTTPException as e:
             print("ERROR in embed_maker.py CreateAnnouncementModal on_submit\n", e)
             await interaction.followup.send("HTTP error: check image url", ephemeral=True)
@@ -57,7 +63,7 @@ async def announcement(interaction: discord.Interaction):
 
 @app_commands.checks.has_any_role(STAFF_ROLE_ID, BEAMDOG_ROLE_ID)
 @app_commands.checks.bot_has_permissions(send_messages=True)
-@app_commands.context_menu(name="Edit embed")
+@app_commands.context_menu(name="Edit announcement")
 async def edit_announcement(interaction: discord.Interaction, message: discord.Message):
     if message.author != bot.user:
         await interaction.response.send_message("Cannot edit message not sent by the same bot.", ephemeral=True)
@@ -75,11 +81,13 @@ async def edit_announcement(interaction: discord.Interaction, message: discord.M
         footer = embed.footer.text if embed.footer else None
         color = f'{embed.color.value:06x}' if embed.color else None
         image = embed.image.url if embed.image else None
-        await interaction.response.send_modal(CreateEmbedModal(vals=(title, description, footer, color, image), message=message))
+        await interaction.response.send_modal(CreateAnnouncementModal(vals=(title, description, footer, color, image), message=message))
+        cur.execute("INSERT INTO announcement_meta_data VALUES (?, ?)",(int(message.id), int(interaction.user.id)))
+        conn.commit()
         if datetime.now(timezone.utc) - message.created_at > timedelta(days=1.0):
             await interaction.guild.get_channel_or_thread(SERVER_COMM_CH).send(f"An embed older than a day was edited: {message.jump_url}")
 
 
-#tree.add_command(edit_announcement)
+tree.add_command(edit_announcement)
 
 

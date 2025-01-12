@@ -59,6 +59,18 @@ cur.execute(  # currently channel is expected to take a json serialized list of 
     )
     """
 )
+
+# Save the message ID and the user id so we can determine ~~if someone is misusing the bot~~ who posted a pic of poop in the urinal as an announcement with this bot
+cur.execute(
+    """
+    CREATE TABLE IF NOT EXISTS announcement_meta_data (
+        message_id INTEGER,
+        user_id INTEGER
+    )
+    """
+)
+# Consider adding more info to the above later. For now as long as we have the message id and the user id we can survive. Keep in mind saving message content or similar will require expensive encryption
+
 conn.commit()
 """Here's a tip on how to update a database schema: 
 Add the following after the create stmt:
