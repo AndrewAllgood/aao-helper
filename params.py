@@ -116,38 +116,47 @@ TOURNAMENTS_CATEGORY = 731709452213944371 #TOURNAMENTS
 SHOWCASE_CHANNELS = {
     948991011223379968: { #league-showcase
         'gallery': 948992296458784788, #grandstands
+        'role': 945593264441004102,
         'active': 776900323032956929 #A&A LEAGUE
     },
     731709533805608961: { #solos-showcase-1
         'gallery': 949939893449134111, #peanut-gallery-1
+        'role': 731709585295147018,
         'active': TOURNAMENTS_CATEGORY
     },
     946212630459220028: { #solos-showcase-2
         'gallery': 946226164597399652, #peanut-gallery-2
+        'role': 945629252202692658,
         'active': TOURNAMENTS_CATEGORY
     },
     949006458031337563: { #duos-showcase-1
         'gallery': 949939233404125185, #duos-peanut-gallery-1
+        'role': 732049477770149889,
         'active': TOURNAMENTS_CATEGORY
     },
     949006487466942545: { #duos-showcase-2
         'gallery': 949939291088371782, #duos-peanut-gallery-2
+        'role': 945629351393759312,
         'active': TOURNAMENTS_CATEGORY
     },
     944192041133416488: { #blitz-showcase
         'gallery': 1170113724359659650, #blitz-peanut-gallery
+        'role': 1170113943889530971,
         'active': TOURNAMENTS_CATEGORY
     },
     724102588571582554: { #solos-finals
         'gallery': None,
+        'role': 733024838557499494,
         'active': TOURNAMENTS_CATEGORY
     },
     916778542023471144: { #ll-solos-finals
         'gallery': None,
+        'role': 733024838557499494,
         'active': TOURNAMENTS_CATEGORY
     },
     901995070784438274: { #duos-finals
         'gallery': None,
+        'role': 887023471064940624,
         'active': TOURNAMENTS_CATEGORY
     }
 }
@@ -165,6 +174,7 @@ if DEBUG:
     SHOWCASE_CHANNELS = {
         940445952534257695: {
             'gallery': 941087323054030878,
+            'role': 1327598187048861716,
             'active': 864688826005454898
         }
     }
