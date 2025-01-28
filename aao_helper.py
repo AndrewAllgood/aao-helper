@@ -1,9 +1,7 @@
 import asyncio
-import typing
-from doctest import debug_script
 
 import discord
-from discord import app_commands, Colour
+from discord import app_commands
 from discord.ext import tasks
 from typing import Optional
 import re
@@ -69,11 +67,12 @@ async def sides(interaction: discord.Interaction, player_one: str, player_two: s
     else:
         await interaction.response.send_message('\n'.join(a + b for a, b in zip(game_sides[g], players)))
 
+
 # Roll a six sided die. Optional user-input argument `amount`. if not specified, defaults to 1
 @tree.command(description='Rolls selected amount of d6 dice, or one d6 die if no integer is specified')
 @app_commands.checks.bot_has_permissions(send_messages=True)
 @app_commands.describe(amount='Amount of dice to roll. Leave empty for one')
-async def dice(interaction: discord.Interaction, amount: typing.Optional[int]):
+async def dice(interaction: discord.Interaction, amount: Optional[int]):
     if DEBUG:
         print("dice command received")
 
@@ -107,6 +106,7 @@ async def dice(interaction: discord.Interaction, amount: typing.Optional[int]):
         print(f'res: {res}')
 
     await interaction.response.send_message(res)
+
 
 @tree.command(description="Ping all non-Staff, non-bot members who don't have Commanders role.")
 @app_commands.default_permissions(manage_guild=True)
@@ -269,8 +269,6 @@ async def on_message(message: discord.Message):
 @bot.event
 async def on_message_edit(before, after):
     await message_checks(after)
-    before_embed = discord.Embed(title='Before Edit', type='rich', colour=discord.Colour.brand_red(), description=before.content[:1750])
-    after_embed = discord.Embed(title='After Edit', type='rich', colour=discord.Colour.brand_green(), description=after.content[:1750])
 
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):

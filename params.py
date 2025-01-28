@@ -2,11 +2,13 @@ import discord
 from discord.ext import commands
 import sqlite3
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
 
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+DEBUG = bool(sys.argv[1:] and sys.argv[1].lower() == 'test')  # simple command line test mode flag
 intents = discord.Intents.all()
 
 bot = commands.Bot(command_prefix='/', intents=intents, help_command=None)
@@ -60,17 +62,6 @@ cur.execute(  # currently channel is expected to take a json serialized list of 
     """
 )
 
-# Save the message ID and the user id so we can determine ~~if someone is misusing the bot~~ who posted a pic of poop in the urinal as an announcement with this bot
-cur.execute(
-    """
-    CREATE TABLE IF NOT EXISTS announcement_meta_data (
-        message_id INTEGER,
-        user_id INTEGER
-    )
-    """
-)
-# Consider adding more info to the above later. For now as long as we have the message id and the user id we can survive. Keep in mind saving message content or similar will require expensive encryption
-
 conn.commit()
 """Here's a tip on how to update a database schema: 
 Add the following after the create stmt:
@@ -97,13 +88,12 @@ upload_ranks_path = os.path.join(txt_views_dir, "upload_ranks.txt")
 with open(upload_ranks_path, 'w') as f:
     pass
 
-DEBUG = True
 
 STAFF_ROLE_ID = 943827276104097842
 MOD_ROLE_ID = 659883868635267075
 BEAMDOG_ROLE_ID = 610480003230072833
 COMMANDERS_ROLE_ID = 941829635367378944
-SERVER_COMM_CH = 670090977356021780 #server-logs
+SERVER_COMM_CH = 670090977356021780 #server-commands
 
 ANNOUNCEMENT_CHANNEL = 610895694206861364
 
