@@ -50,7 +50,7 @@ You also need to do the following:
 
 * When the bot first enters a Discord server or when its commands are updated in terms of the interface (command names, descriptions, and parameters, not function code), you must type `/sync` in any Discord channel as someone with Manage Server perms to register the commands.
 
-Setting the DEBUG variable in `params.py` to `True` allows you to test the bot with different channels and roles etc. The current debug values are for the Discord server A&AO Test Server, as well as the bot A&AO testbot whose token you put after `DISCORD_TESTBOT_TOKEN=` in a (local) `.env` file.
+Calling the main file with first command line argument `test` allows you to test the bot with different channels and roles etc. The current debug values are for the Discord server A&AO Test Server, as well as the bot A&AO testbot whose token you put after `DISCORD_TESTBOT_TOKEN=` in a (local) `.env` file.
 
 ## How to use
 
