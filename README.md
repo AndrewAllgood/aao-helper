@@ -68,6 +68,8 @@ The commands for roll sides, roll dice, and create/edit embed or announcement sh
 
 6. `Message right-click -> Apps -> Edit Message` (context menu command) Only Admin can use. Can edit non-embed in any channel except #server-commands.
 
+Note: to make user or channel mentions function properly when entered through a modal field, they must be in angle bracket format, e.g. <@1234567890> or <#1234567890>. @everyone and @here are exceptions and work as written.
+
 7. `list_non_commanders_mem_pings` Must have Manage Server permission to use. Can only use in #server-commands. Lists the pings of members (not Staff or bot) who for one reason or another do not have the Commanders role, which is supposed to be universal to non-Staff non-bot.
 
 8. `push_channels_as_default` Must have Manage Server permission to use. Basically always call this when creating new channels. Discord's Community Onboarding system has extremely unfortunate behavior for new channels in categories created after Onboarding was switched on, or without category. Anyone who doesn't have Show All Channels ticked (or who fiddles with Browse Channels which will untick Show All Channels) won't be able to see such new channels except via a random "suggested" tab, or by picking them in Browse Channels. This command automatically performs a clever technique to force everyone to see the channels: create a temp role, private the channels to be only that role, give everyone the role (which may take a while), unprivate the channels and delete the role. Carefully read the messages sent by this command for more info.

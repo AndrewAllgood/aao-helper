@@ -13,7 +13,7 @@ class CreateAnnouncementModal(discord.ui.Modal):
         kwargs['title'] = "Enter content for announcement"
         super().__init__(*args, **kwargs)
         self.message = message if message else None  # only valid when editing
-        self.add_item(discord.ui.TextInput(label='Announcement content (max 4000 characters):', default=message.content if message else None, required=True))
+        self.add_item(discord.ui.TextInput(label='Announcement content (max 4000 characters):', default=message.content if message else None, style=discord.TextStyle.paragraph, required=True))
         self.add_item(discord.ui.TextInput(label='Allow pings? "I WANT PAIN" to allow pings', default='I am normal', required=False))
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -21,7 +21,7 @@ class CreateAnnouncementModal(discord.ui.Modal):
 
         pings = self.children[1].value
 
-        if pings == "I WANT PAIN":
+        if pings.upper() == "I WANT PAIN":
             content = self.children[0].value
         else:
             content = escape_mentions(self.children[0].value)
@@ -32,11 +32,12 @@ class CreateAnnouncementModal(discord.ui.Modal):
         try:
             if self.message:
                 await self.message.edit(content=content)
+                msg = self.message
             else:
                 announcement_channel = bot.get_channel(ANNOUNCEMENT_CHANNEL)
-                self.message = await announcement_channel.send(content=content)
+                msg = await announcement_channel.send(content=content)
             if log_channel:
-                await log_channel.send(f"{interaction.user} {'edited' if self.message else 'sent'} the following announcement: {self.message.jump_url}\n\n" + content_abridged)
+                await log_channel.send(f"{interaction.user} {'edited' if self.message else 'sent'} the following announcement: {msg.jump_url}\n\n" + escape_mentions(content_abridged))
             else:
                 await interaction.followup.send("Log channel not found", ephemeral=True)
         except discord.errors.Any as e:
